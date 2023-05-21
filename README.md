@@ -4,7 +4,7 @@
 
 # Introduction
 
-This repository contains the original version of the JTAG-to-Avalon-MM tutorial created using Altera Quartus II 11.1sp1 in March 2012. The tutorial example for the BeMicro-SDK (Cyclone IV) board was synthesized under Quartus Prime Lite 22.1.1. 
+This repository contains the original version of the JTAG-to-Avalon-MM tutorial created using Altera Quartus II 11.1sp1 in March 2012. The tutorial example for the BeMicro-SDK (Cyclone IV) board was synthesized under Quartus Prime Lite 22.1.1.
 
 The JTAG-to-Avalon-MM tutorial was created when Altera was transitioning their system design tool from SOPC Builder to Qsys. Altera was purchased by Intel in 2015 (https://en.wikipedia.org/wiki/Altera). The development tool is now called Intel Quartus Prime, and the system design tool is called Platform Designer. Intel Platform Designer and Altera Qsys generate system design files using the same .qsys extension and format.
 
@@ -67,7 +67,7 @@ Synthesizing the BeMicro-SDK 'qsys_system' design
  - Processing completed
 ~~~
 
-The only issue observed after syntheis, was that Timing Analyzer reported unconstrained paths;
+The only issue observed after synthesis, was that Timing Analyzer reported unconstrained paths;
  * Inputs: pb, sw, JTAG TMS and TDI
  * Outputs: JTAG TDO
 These unconstrained paths will be corrected in the updated version of the tutorial.
