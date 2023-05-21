@@ -1,0 +1,365 @@
+JTAG-to-Avalon-MM Tutorial on the DE2
+-------------------------------------
+
+4/8/2013 D. W. Hawkins (dwh@caltech.edu)
+
+AlteraForum member David Lee indicated he was having some trouble
+with the tutorial in this thread:
+
+http://www.alteraforum.com/forum/showthread.php?t=40261
+
+So I wrote these notes as I checked into the problem, so that
+he could see the steps I performed.
+
+I have Quartus II 12.1sp1 installed on my development machine, but
+Altera have changed their Modelsim setup scripts between 11.1sp1 and
+12.1sp1, so things no longer work correctly (see the second build
+sequence below).
+
+The tutorial was written using Quartus II 11.1sp1.
+
+-------------------------------------------------------------------------------
+Quartus II 11.1sp2 - Synthesis+Simulation Build Procedure
+---------------------------------------------------------
+
+1. Download the zip file from the Altera Wiki
+
+http://www.alterawiki.com/wiki/Using_the_USB-Blaster_as_an_SOPC/Qsys_Avalon-MM_master_Tutorial
+
+   Save as c:/temp/altera_jtag_to_avalon_mm_tutorial.zip
+
+2. Unzip it
+
+3. Start Quartus II 11.1sp2
+
+   I used a VirtualBox VM with Windows-XP and Quartus 11.1sp2 web edition
+   for this test.
+
+4. Select the Tcl console
+
+5. Change directory to the Qsys build
+
+   tcl> cd {C:\temp\altera_jtag_to_avalon_mm_tutorial\hdl\boards\de2\qsys_system}
+
+6. Source the synthesis script
+
+   tcl> source scripts/synth.tcl
+
+   The output is
+
+   Synthesizing the DE2 'qsys_system' design
+   -----------------------------------------
+    - Quartus Version 11.1 Build 259 01/25/2012 Service Pack 2 SJ Full Version
+    - Creating the Quartus work directory
+      * C:/Temp/altera_jtag_to_avalon_mm_tutorial/hdl/boards/de2/qsys_system/qwork
+    - Create the project 'de2'
+      * create a new de2 project
+    - Check the Qsys system
+      * Copying the Qsys system file to the build directory
+      * Please run Qsys, click on the 'Generation' tab, select 'Verilog'
+        for 'Create simulation model', and click the 'Generate' button
+        to generate the Qsys system,  and then re-run this script
+
+   Per the instruction, run Qsys, open qsys_system.qsys, and click on the generate tab.
+   Change the "Create Simulation Model" pull-down menu to create the Verilog simulation
+   directory, i.e., the folder qwork/qsys_system/simulation once things are generated.
+
+   Click the "Generate" button to generate the system
+
+   Re-run the script by sourcing it again
+
+   tcl> source scripts/synth.tcl
+
+   The output is
+
+   Synthesizing the DE2 'qsys_system' design
+   -----------------------------------------
+    - Quartus Version 11.1 Build 259 01/25/2012 Service Pack 2 SJ Full Version
+    - Create the project 'de2'
+      * close the project
+      * open the existing de2 project
+    - Check the Qsys system
+    - Creating the design files list
+    - Applying constraints
+    - Processing the design
+    - Processing completed
+
+   This confirms that the project synthesizes correctly under Quartus II 11.1sp2.
+
+7. Start Modelsim
+
+   Modelsim-ASE 10.0c was used for this test (the version used by Quartus 11.1sp2)
+
+8. Change directory per the instructions in the tutorial PDF, which in my case was
+
+   Modelsim> cd {C:\temp\altera_jtag_to_avalon_mm_tutorial\hdl\qsys_system}
+
+10. Edit the simulation script
+
+   Since this project is using the DE2 board, not the BeMicro-SDK, edit the
+   script in scripts/sim.tcl to change the board name from bemicro_sdk to de2
+
+   i.e., change the line
+
+   set board $hdl/boards/bemicro_sdk
+
+   to
+
+   set board $hdl/boards/de2
+
+11. Run the simulation script
+
+   Modelsim> source scripts/sim.tcl
+
+   The script ends with the message:
+
+   # JTAG-to-Avalon-MM tutorial testbench procedures
+   # -----------------------------------------------
+   #
+   #   qsys_system_bfm_master_tb  - run the Avalon-MM BFM testbench
+   #   qsys_system_jtag_master_tb - run the JTAG-to-Avalon-MM testbench
+
+
+   Type in one of these procedures (copy-and-paste it to the console) to run
+   the two testbenches described in the tutorial PDF.
+
+   For example
+
+   Modelsim> qsys_system_bfm_master_tb
+
+   ... lots of messages from Modelsim ... and then messages from the testbench
+
+	# ===============================================================
+	# JTAG-to-Avalon-MM SOPC System Testbench (using the BFM master)
+	# ===============================================================
+	#
+	# 0:  verbosity_pkg.set_verbosity: Setting Verbosity level=4 (VERBOSITY_INFO)
+	#  * Deassert reset
+	#
+	# -----------------------------------------------
+	# 1: Test the LEDs.
+	# -----------------------------------------------
+	#  * Write 0xAA to the LEDs
+	#    - LED register value = aah
+	#    - LED port value = aah
+	#  * Walking 1's test
+	#    - LED port value = 01h
+	#    - LED port value = 02h
+	#    - LED port value = 04h
+	#    - LED port value = 08h
+	#    - LED port value = 10h
+	#    - LED port value = 20h
+	#    - LED port value = 40h
+	#    - LED port value = 80h
+	#
+	# -----------------------------------------------
+	# 2: Test the push buttons.
+	# -----------------------------------------------
+	#  * Push button value = 55h
+	#  * Walking 1's test
+	#    - Push button value = 01h
+	#    - Push button value = 02h
+	#    - Push button value = 04h
+	#    - Push button value = 08h
+	#    - Push button value = 10h
+	#    - Push button value = 20h
+	#    - Push button value = 40h
+	#    - Push button value = 80h
+	#
+	# -----------------------------------------------
+	# 3: Test the on-chip RAM.
+	# -----------------------------------------------
+	#  * Fill 1024 locations of RAM with an incrementing count
+	#  * Read and check the RAM
+	#
+	# ===============================================
+	# Simulation complete.
+	# ===============================================
+	#
+
+   and then try the other testbench
+
+   Modelsim> qsys_system_jtag_master_tb
+
+   ... lots of messages from Modelsim ... and then messages from the testbench
+   (this simulation takes a *lot* longer to run, since the testbench commands
+    need to be serialized over JTAG)
+
+	# ===============================================================
+	# JTAG-to-Avalon-MM Qsys System Testbench (using the JTAG master)
+	# ===============================================================
+	#
+	#  * Reset the JTAG controller
+	#  * Deassert reset
+	#
+	# -----------------------------------------------
+	# 1: Test the JTAG protocol special character codes.
+	# -----------------------------------------------
+	#  * Check the JTAG-to-Avalon-ST special codes encode/decode as data: 4a4dh
+	#  * Check the bytes-to-packets special codes encode/decode as data: 7a7b7c7dh
+	#
+	# -----------------------------------------------
+	# 2: Test the LEDs.
+	# -----------------------------------------------
+	#  * Write 0xAA to the LEDs
+	#    - LED register value = aah
+	#    - LED port value = aah
+	#  * Walking 1's test
+	#    - LED port value = 01h
+	#    - LED port value = 02h
+	#    - LED port value = 04h
+	#    - LED port value = 08h
+	#    - LED port value = 10h
+	#    - LED port value = 20h
+	#    - LED port value = 40h
+	#    - LED port value = 80h
+	#
+	# -----------------------------------------------
+	# 3: Test the push buttons.
+	# -----------------------------------------------
+	#  * Push button value = 55h
+	#  * Walking 1's test
+	#    - Push button value = 01h
+	#    - Push button value = 02h
+	#    - Push button value = 04h
+	#    - Push button value = 08h
+	#    - Push button value = 10h
+	#    - Push button value = 20h
+	#    - Push button value = 40h
+	#    - Push button value = 80h
+	#
+	# -----------------------------------------------
+	# 4: Test the on-chip RAM.
+	# -----------------------------------------------
+	#  * Fill 32 locations of RAM with an incrementing count
+	#  * Read and check the RAM
+	#
+	# ===============================================
+	# Simulation complete.
+	# ===============================================
+	#
+
+   This confirms that the project simulates correctly under Quartus II 11.1sp2
+   with Modelsim-ASE 10.0c.
+
+-------------------------------------------------------------------------------
+Quartus II 12.1sp1 - Synthesis+Simulation Build Procedure
+---------------------------------------------------------
+
+1. Download the zip file from the Altera Wiki
+
+http://www.alterawiki.com/wiki/Using_the_USB-Blaster_as_an_SOPC/Qsys_Avalon-MM_master_Tutorial
+
+   Save as c:/temp/altera_jtag_to_avalon_mm_tutorial.zip
+
+2. Unzip it
+
+3. Start Quartus II 12.1sp1 (I used the subscription edition for this test)
+
+4. Select the Tcl console
+
+5. Change directory to the Qsys build
+
+   tcl> cd {C:\temp\altera_jtag_to_avalon_mm_tutorial\hdl\boards\de2\qsys_system}
+
+6. Source the synthesis script
+
+   tcl> source scripts/synth.tcl
+
+   The output is
+
+   Synthesizing the DE2 'qsys_system' design
+   -----------------------------------------
+    - Quartus Version 12.1 Build 243 01/31/2013 Service Pack 1 SJ Full Version
+    - Creating the Quartus work directory
+      * C:/temp/altera_jtag_to_avalon_mm_tutorial/hdl/boards/de2/qsys_system/qwork
+    - Create the project 'de2'
+      * create a new de2 project
+    - Check the Qsys system
+      * Copying the Qsys system file to the build directory
+      * Please run Qsys, click on the 'Generation' tab, select 'Verilog'
+        for 'Create simulation model', and click the 'Generate' button
+        to generate the Qsys system,  and then re-run this script
+
+   Per the instruction, run Qsys, open qsys_system.qsys, and click on the generate tab.
+   Change the "Create Simulation Model" pull-down menu to create the Verilog simulation
+   directory, i.e., the folder qwork/qsys_system/simulation once things are generated.
+
+   Click the "Generate" button to generate the system
+
+   Re-run the script by sourcing it again
+
+   tcl> source scripts/synth.tcl
+
+   The output is
+
+   Synthesizing the DE2 'qsys_system' design
+   -----------------------------------------
+    - Quartus Version 12.1 Build 243 01/31/2013 Service Pack 1 SJ Full Version
+    - Create the project 'de2'
+      * close the project
+      * open the existing de2 project
+    - Check the Qsys system
+    - Creating the design files list
+    - Applying constraints
+    - Processing the design
+    - Processing completed
+
+   This confirms that the project synthesizes correctly under Quartus II 12.1sp1.
+
+7. Start Modelsim
+
+   Modelsim-ASE 10.1b was used for this test (the version used by Quartus 12.1sp1)
+
+8. Change directory per the instructions in the tutorial PDF, which in my case was
+
+   Modelsim> cd {C:\temp\altera_jtag_to_avalon_mm_tutorial\hdl\qsys_system}
+
+10. Edit the simulation script
+
+   Since this project is using the DE2 board, not the BeMicro-SDK, edit the
+   script in scripts/sim.tcl to change the board name from bemicro_sdk to de2
+
+   i.e., change the line
+
+   set board $hdl/boards/bemicro_sdk
+
+   to
+
+   set board $hdl/boards/de2
+
+11. Run the simulation script
+
+   Modelsim> source scripts/sim.tcl
+
+   Eventually the script generates error messages like:
+
+   # ** Error: (vlog-19) Failed to access library 'qsys_system_bfm_master' at "qsys_system_bfm_master"
+
+   and
+
+   # ** Error: C:/temp/altera_jtag_to_avalon_mm_tutorial/hdl/qsys_system/test/qsys_system_bfm_master_tb.sv(48)
+   # ** Error: C:/temp/altera_jtag_to_avalon_mm_tutorial/hdl/qsys_system/test/qsys_system_bfm_master_tb.sv(49): Could not find the package (avalon_mm_pkg)
+
+   Editing scripts/sim.tcl and adding the line "+++" after
+
+   # Build the Qsys components
+   dev_com
+   com
+
+   echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+
+   and re-running the script shows that the errors come from trying to build the top-level
+   testbenches.
+
+   This error is because Altera have changed the way they create their libraries in the dev_com and com
+   scripts relative to version 11.1sp1.
+
+   C:\temp\altera_jtag_to_avalon_mm_tutorial\hdl\boards\de2\qsys_system\qwork\qsys_system\simulation\mentor\msim_setup.tcl
+
+   shows that the script now compiles every component into its own work library via calls to vlog -work.
+
+   This is really annoying.
+
+   Recommendation: Stick with v11.1sp1 until I have time to update the tutorial.
+

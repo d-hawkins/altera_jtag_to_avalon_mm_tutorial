@@ -1,0 +1,2938 @@
+\documentclass[10pt,twoside]{article}
+
+% Math symbols
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% Headers/Footers
+\usepackage{fancyhdr}
+
+% Colors
+\usepackage[usenames,dvipsnames]{color}
+
+% Importing and manipulating graphics
+\usepackage{graphicx}
+\usepackage{subfig}
+\usepackage{lscape}
+
+% Misc packages
+\usepackage{verbatim}
+\usepackage{dcolumn}
+\usepackage{ifpdf}
+\usepackage{enumerate}
+
+% PDF Bookmarks and hyperref stuff
+\usepackage[
+  bookmarks=true,
+  bookmarksnumbered=true,
+  colorlinks=true,
+  filecolor=blue,
+  linkcolor=blue,
+  urlcolor=blue,
+  hyperfootnotes=true
+  citecolor=blue
+]{hyperref}
+
+% Improved hyperlinking to figures
+% (include after hyperref)
+\usepackage[all]{hypcap}
+
+% Improved citation handling
+% (include after the hyperref stuff)
+\usepackage{cite}
+
+% Pretty-print code
+\usepackage{listings}
+
+% -----------------------------------------------------------------
+% Hyper-references
+% -----------------------------------------------------------------
+%
+% This page has lots of good advice on hyper-references, including
+% the use of the hypcap package and \phantomsection for generating
+% labels to text.
+%
+% http://en.wikibooks.org/wiki/LaTeX/Labels_and_Cross-referencing
+%
+% -----------------------------------------------------------------
+% Setup the margins
+% -----------------------------------------------------------------
+% Footer Template
+
+% Set left margin - The default is 1 inch, so the following
+% command sets a 1.25-inch left margin.
+\setlength{\oddsidemargin}{0.25in}
+\setlength{\evensidemargin}{0.25in}
+
+% Set width of the text - What is left will be the right
+% margin. In this case, right margin is
+% 8.5in - 1.25in - 6in = 1.25in.
+\setlength{\textwidth}{6in}
+
+% Set top margin - The default is 1 inch, so the following
+% command sets a 0.75-inch top margin.
+%\setlength{\topmargin}{-0.25in}
+
+% Set height of the header
+\setlength{\headheight}{0.3in}
+
+% Set vertical distance between the header and the text
+\setlength{\headsep}{0.2in}
+
+% Set height of the text
+\setlength{\textheight}{8.5in}
+
+% Set vertical distance between the text and the
+% bottom of footer
+\setlength{\footskip}{0.4in}
+
+% -----------------------------------------------------------------
+% Allow floats to take up more space on a page.
+% -----------------------------------------------------------------
+
+% see page 142 of the Companion for this stuff and the
+% documentation for the fancyhdr package
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\bottomfraction}{0.95}
+% dont make this too small
+\renewcommand{\floatpagefraction}{0.35}
+\setcounter{totalnumber}{5}
+
+% -----------------------------------------------------------------
+% Abbreviated symbols
+% -----------------------------------------------------------------
+\newcommand{\sinc}{\ensuremath{\,\text{sinc}}}
+\newcommand{\rect}{\ensuremath{\,\text{rect}}}
+
+% =================================================================
+% The document starts here
+% =================================================================
+%
+\begin{document}
+\title{Altera JTAG-to-Avalon-MM Tutorial\\
+{\large \em Version 1.0}}
+\author{D. W. Hawkins (dwh@ovro.caltech.edu)}
+\date{\today}
+%\date{March 12, 2012}
+\maketitle
+
+% No header/footer on the first page
+\thispagestyle{empty}
+
+\tableofcontents
+
+% start the intro on an odd page
+\cleardoublepage
+%\clearpage
+
+% Set up the header/footer
+\pagestyle{fancy}
+\lhead{Altera JTAG-to-Avalon-MM Tutorial}
+\chead{}
+\rhead{\today}
+\lfoot{}
+\cfoot{}
+\rfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% Set the listings package language to Tcl
+\lstset{language=Tcl}
+
+% =================================================================
+\section{Introduction}
+% =================================================================
+
+\begin{figure}[t]
+  \begin{center}
+    \includegraphics[width=0.95\textwidth]{figures/system_diagram.pdf}
+  \end{center}
+  \caption{System block diagram for host communication to an
+  Altera Avalon hardware design.}
+  \label{fig:system_diagram}
+\end{figure}
+
+A common question on the Altera forum is;
+%
+\begin{quote}
+\em How can I use a USB-Blaster to communicate with my system design?
+\end{quote}
+%
+The Altera USB-Blaster interface is used by the Quartus II
+programmer to configure the FPGA, used by the SignalTap II logic 
+analyzer for trace capture, and used by the NIOS II processor
+tools for debugging and memory inspection, so it is reasonable
+for users to assume that the interface can be used
+to communicate with their designs. This tutorial demonstrates
+how to implement this communications.
+
+The target audience for this tutorial is developers new to Altera's 
+SOPC Builder and Qsys system design tools.  This tutorial improves
+the user experience with these tools, by providing a step-by-step
+walk-though of the system design in Figure~\ref{fig:system_diagram}.
+While many of the concepts covered will be foreign to the new user,
+having an example of the end-to-end system design sequence, makes
+reading and comprehension of the {\em extensive} tool and device 
+documentation a little easier.
+
+The tutorial shows how to create and simulate the hardware
+design shown on the right of Figure~\ref{fig:system_diagram},
+and then how to communicate with the design. The hardware design 
+is based solely on Altera-provided IP components. The software
+design uses the Altera Tcl-based tools {\em System Console} and
+\verb+quartus_stp+ for the host-to-JTAG communications, and uses 
+a (generic) Tcl GUI for the client application. Client-to-server
+communications are performed using ASCII strings transported using
+TCP/IP (sockets); the client can be easily replaced with one 
+written in your favorite programming language.
+
+The tutorial walks the reader through the creation, synthesis,
+and simulation of SOPC and Qsys systems. Tcl scripts are provided
+that automate the regeneration and simulation of the systems.
+The tutorial points out some of the problems with the Altera-provided
+IP and software; in part so that the reader can avoid the
+problems, but also in the hope that Altera will rectify them.
+
+If you liked this tutorial, or have feedback or suggestions on
+how it can be improved, please post a message to the Altera
+Forum thread
+%
+\begin{center}
+\url{http://www.alteraforum.com/forum/showthread.php?t=34787}.
+\end{center}
+
+% -----------------------------------------------------------------
+\subsection*{Software Versions}
+% -----------------------------------------------------------------
+
+The tutorial was written using Altera Quartus 11.1sp1 and 
+Modelsim-ASE ({\em Altera Starter Edition}) 10.0c. 
+Appendix~\ref{sec:software_versions} provides details on
+the operating systems tested, and differences with
+earlier tool versions.
+
+\clearpage
+% -----------------------------------------------------------------
+\subsection*{Tutorial Source Code}
+% -----------------------------------------------------------------
+
+The tutorial zip file, 
+\verb+altera_jtag_to_avalon_mm_tutorial.zip+~\cite{Hawkins_Altera_JTAG_to_Avalon_MM_Tutorial_2012}, 
+unzips\footnote{See Appendix~\ref{app:tutorial_source} for
+the recommended unzip methods under Windows and Linux.} to create
+the directory layout shown in Table~\ref{tab:directory_layout}.
+The path to the unzipped directory is referred to in this document
+via the variable \verb+TUTORIAL+. For example, if you unzip the 
+file into your Windows \verb+c:/temp+ directory, then paths in 
+this document are referenced relative to
+%
+\begin{verbatim}
+TUTORIAL = c:/temp/altera_jtag_to_avalon_mm_tutorial
+\end{verbatim}
+%
+The example hardware design described in the text targets the
+Arrow BeMicro-SDK Cyclone IV board, but the procedure works
+equivalently well on any other development board. The example source 
+contains completed designs for the Arrow BeMicro-SDK Cyclone IV, 
+Arrow BeMicro Cyclone III, and Terasic DE2 Cyclone II boards.
+The main difference between boards is in their top-level entities,
+which contain all pins used on each board.
+The Qsys or SOPC system is instantiated into the top-level entity.
+
+% -----------------------------------------------------------------
+% Tutorial Directory Layout
+% -----------------------------------------------------------------
+%
+\begin{table}[t]
+\caption{{\tt altera\_jtag\_to\_avalon\_mm\_tutorial} directory layout.}
+\label{tab:directory_layout}
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+Path & Description\\
+\hline
+&\\
+\verb+doc/+ & Documentation\\
+\verb+hdl/+ & HDL source code\\
+\verb+tcl/+ & Tcl client/server source code\\
+&\\
+\hline
+\multicolumn{2}{|l|}{\bf Simulation}\\
+\hline
+&\\
+\verb+hdl/sopc_system/+ & SOPC system simulation\\
+\verb+hdl/qsys_system/+ & Qsys system simulation\\
+&\\
+\hline
+\multicolumn{2}{|l|}{\bf Synthesis}\\
+\hline
+&\\
+\verb+hdl/boards/+      & Hardware targets\\
+&\\
+\verb+hdl/boards/bemicro_sdk/+             & Arrow BeMicro-SDK projects\\
+\verb+hdl/boards/bemicro_sdk/sopc_system/+ & SOPC system synthesis\\
+\verb+hdl/boards/bemicro_sdk/qsys_system/+ & Qsys system synthesis\\
+\verb+hdl/boards/bemicro_sdk/share/+       & Board constraints\\
+&\\
+\verb+hdl/boards/bemicro/+             & Arrow BeMicro projects\\
+\verb+hdl/boards/bemicro/sopc_system/+ & SOPC system synthesis\\
+\verb+hdl/boards/bemicro/qsys_system/+ & Qsys system synthesis\\
+\verb+hdl/boards/bemicro/share/+       & Board constraints\\
+&\\
+\verb+hdl/boards/de2/+             & Terasic DE2 projects\\
+\verb+hdl/boards/de2/sopc_system/+ & SOPC system synthesis\\
+\verb+hdl/boards/de2/qsys_system/+ & Qsys system synthesis\\
+\verb+hdl/boards/de2/share/+       & Board constraints\\
+&\\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+\clearpage
+% =================================================================
+\section{SOPC Builder and Qsys}
+% =================================================================
+
+Altera provides two tools for graphically building hardware
+systems; the classic tool {\em SOPC Builder}, and the new tool 
+{\em Qsys}. The main difference between tools is the interconnect
+fabric, and the support for hierarchical designs in 
+Qsys~\cite{Altera_Qsys_NoC_Whitepaper_2011}. 
+
+The {\em Avalon Interface Specification} consists of bus protocols
+and an interconnect fabric defined by 
+Altera~\cite{Altera_Interface_Specification_SOPC_2011,
+Altera_Interface_Specification_Qsys_2011}. The bus protocols
+consist of two variants; {\em Avalon Memory Mapped (Avalon-MM)}
+and {\em Avalon Streaming (Avalon-ST)}. The Avalon-MM protocol
+is used to create systems like that shown in Figure~\ref{fig:system_diagram},
+where multiple masters connect to multiple slaves,
+and the masters control the slaves by performing read
+and write accesses to addresses defined by the
+system {\em memory map}. The Avalon-ST protocol
+is used in data streaming applications, such as signal processing,
+where data sources pass data onto data sinks.
+
+SOPC Builder is used to create systems containing Avalon-MM 
+components and Avalon-ST components. The Avalon fabric is used
+to connect Avalon-MM masters to Avalon-MM slaves. SOPC Builder
+automates the systematic and tedious task of creating address
+decoding, bus arbitration, and multiplexing logic between masters and slaves.
+The connections between Avalon-ST sources and sinks are 
+point-to-point, so no fabric is required.
+
+Qsys takes a different approach to the implementation of the 
+interconnect fabric; master and slave transactions are
+converted to packets, and those packets are transported
+through a {\em network-on-chip}. This approach abstracts the
+bus interface protocol of the masters and slaves, allowing
+different bus protocols to interface to the network.
+This allows Altera to continue to use the Avalon-MM protocol,
+and to add support for ARM defined bus protocols such as the
+\href{http://en.wikipedia.org/wiki/Advanced_Microcontroller_Bus_Architecture}
+{Advanced Microcontroller Bus Architecture (AMBA)}
+Advanced eXtensible Interface (AXI).
+For example, a Qsys system can be created with Avalon-MM
+masters and AXI slaves, and the interconnect fabric
+performs the required bus protocol translation.
+To create this system using SOPC Builder, you would need
+to create an Avalon-MM-to-AMBA bridge to {\em adapt}
+the AMBA slave before connecting it to the Avalon-MM fabric.
+
+The following sections define the system shown in 
+Figure~\ref{fig:system_diagram} first using SOPC Builder
+and then using Qsys. The two designs allow you to contrast
+the two tools.
+
+\clearpage
+% =================================================================
+\section{SOPC Builder Design Flow}
+% =================================================================
+
+In this section, the system in Figure~\ref{fig:system_diagram}
+is created using SOPC Builder, synthesized using Quartus, and
+simulated using Modelsim. The design is implemented using
+the Quartus GUI. Once the design is complete, I show how to
+create Tcl scripts that can regenerate the system from the
+minimum number of design files.
+
+% -----------------------------------------------------------------
+\subsection{Project Creation}
+% -----------------------------------------------------------------
+
+Start Quartus 11.1sp1 and create a new project targeting the BeMicro-SDK board;
+\begin{itemize}
+\item File$\rightarrow$New Project Wizard
+\item {\em Directory, Name, Top-level Entity [page 1 of 5]}
+\begin{itemize}
+\item Working directory name: \verb+c:\temp\altera_jtag_to_avalon_mm_tutorial\sopc\+
+\item Project and top-level entity name: \verb+tutorial+
+\item Click {\em Next}
+\item Click {\em Yes} when prompted to create the working directory
+\end{itemize}
+%
+\item {\em Add Files [page 2 of 5]}
+\begin{itemize}
+\item Click {\em Next}
+\end{itemize}
+%
+\item {\em Family \& Device Settings [page 3 of 5]}
+\begin{itemize}
+\item Device Family: use the pull-down menu to select \verb+Cyclone IV E+
+\item In the Available Devices spreadsheet, select \verb+EP4CE22F17C7+
+\item Click {\em Next}
+\end{itemize}
+%
+\item Click {\em Finish}, leaving all other settings at their defaults
+\end{itemize}
+
+\clearpage
+% -----------------------------------------------------------------
+\subsection{SOPC Builder Component}
+% -----------------------------------------------------------------
+%
+% Screen-shot saved with Paint to PNG
+\begin{figure}[t]
+  \begin{center}
+    \includegraphics[width=0.95\textwidth]{figures/sopc_system.png}
+  \end{center}
+  \caption{SOPC Builder {\tt sopc\_system} design.}
+  \label{fig:sopc_system}
+\end{figure}
+
+Start SOPC Builder and create the system shown in Figure~\ref{fig:sopc_system};
+%
+\begin{itemize}
+\item Tools$\rightarrow$SOPC Builder
+\item In the {\em Create New System} GUI select \verb+Verilog+ as
+the target language, and name it \verb+sopc_system+.
+
+Selecting Verilog is a {\em requirement}, since in the next section
+I show how to simulate the system using the free version of Modelsim
+supplied by Altera, i.e., Modelsim-ASE.
+The Altera Avalon and Avalon Verification IP components are
+written in Verilog and SystemVerilog, and Modelsim-ASE only supports
+single language simulation. The full version of Modelsim can be used
+for mixed language designs.
+
+\item Under {\em Clock Settings}, rename the clock to \verb+clk+
+(the default clock frequency of 50MHz is correct for the BeMicro-SDK).
+%
+\item Add the SOPC System components from the {\em Component Library};
+\begin{itemize}
+%
+\item Add the Avalon-MM BFM master;
+\begin{itemize}
+\item Verification$\rightarrow$Simulation$\rightarrow$Altera Avalon-MM Master BFM
+
+For previous versions of Quartus use;\newline
+Avalon Verification Suite$\rightarrow$Altera Avalon-MM Master BFM
+\item Uncheck {\em Use the burstcount signal} and click finish.
+\item Right click on the component and rename it \verb+bfm_master+.
+\end{itemize}
+%
+\item Add the JTAG-to-Avalon-MM master;
+\begin{itemize}
+\item Bridges$\rightarrow$Memory Mapped$\rightarrow$JTAG to Avalon Master Bridge
+
+For previous versions of Quartus use;\newline
+Bridges and Adapters$\rightarrow$Memory Mapped$\rightarrow$JTAG to Avalon Master Bridge
+\item Accept the defaults, and click finish.
+\item Right click on the component and rename it \verb+jtag_master+.
+\end{itemize}
+%
+\item Add the LED parallel I/O slave;
+\begin{itemize}
+\item Peripherals$\rightarrow$Microcontroller Peripherals$\rightarrow$PIO
+(Parallel I/O).
+\item Accept the defaults, and click finish.
+\item Right click on the component and rename it \verb+led_pio+.
+\item Connect the slave to the two masters; it will be assigned the base 
+address \verb+0x00000000+.
+\end{itemize}
+%
+\item Add the button parallel I/O slave;
+\begin{itemize}
+\item Peripherals$\rightarrow$Microcontroller Peripherals$\rightarrow$PIO
+(Parallel I/O).
+\item Change the direction to {\em input}, and click finish.
+\item Right click on the component and rename it \verb+button_pio+.
+\item Connect the slave to the two masters; and change its base address to
+\verb+0x00000010+.
+\end{itemize}
+%
+\item Add the on-chip memory slave;
+\begin{itemize}
+\item Memories and Memory Controllers$\rightarrow$On-chip$\rightarrow$On-chip
+Memory (RAM or ROM).
+\item Uncheck {\em Initialize memory content}, and click finish.
+\item Right click on the component and rename it \verb+onchip_ram+.
+\item Connect the slave to the two masters; and change its base address to
+\verb+0x00001000+.
+\end{itemize}
+%
+\end{itemize}
+%
+\item The SOPC System should now look like that in Figure~\ref{fig:sopc_system}.
+The warnings shown in the SOPC builder GUI can be ignored.
+%
+\item Click {\em Generate} to generate the system.
+
+SOPC Builder pops-up a {\em Save changes?} dialog window asking if you want 
+to {\em Save changes to unnamed?} Click the {\em Save} button to bring
+up the {\em Save} dialog window. Enter the system name, \verb+sopc_system.sopc+,
+and click {\em Save}\footnote{See Appendix~\ref{app:altera_bugs}, 
+Note 1.}\phantomsection\label{bug:1}.
+
+\item When the message {\em Info: System generation was successful} appears, click 
+the {\em Exit} button (click {\em Save} again when it prompts you).
+
+\end{itemize}
+
+So what did this just create? In the project directory, you will
+see Verilog files for the SOPC system components;
+\verb+bfm_master.v+, \verb+jtag_master.v+, \verb+led_pio.v+,
+\verb+button_pio.v+, and \verb+onchip_ram.v+, and
+a Verilog file for the top-level SOPC system,
+\verb+sopc_system.v+. Open the files and look at the Verilog
+code; the BFM master, JTAG master, and on-chip RAM files
+simply instantiate components, while the LED and button PIO
+components contain Verilog code. The SOPC system file is
+the most complicated, it contains automatically generated
+interconnect code (the main reason for using the system
+generation tool). The SOPC system file is not particularly
+readable, however, there are important sections of the file
+that are discussed in Section~\ref{sec:sopc_system_simulation}.
+
+The SOPC system description is implemented in the XML file
+\verb+sopc_system.sopc+. All of the Verilog files generated
+by SOPC Builder can be considered as {\em intermediate} files,
+and they can be deleted and regenerated; much like you would
+consider object files as intermediate files when compiling and
+linking programs.
+%
+Go ahead and delete all the SOPC system generated Verilog files
+and other related files with \verb+sopc_system+ in their names
+({\em except} of course for \verb+sopc_system.sopc+), 
+delete the directories \verb+jtag_master+ and \verb+sopc_system_sim+ 
+too. Open the SOPC Builder GUI, and you will see the system 
+unchanged. Click {\em Generate} and all the files you just deleted
+will be regenerated.
+%
+The point of this last exercise was to show you that the
+SOPC System component can be regenerated from the single
+file \verb+sopc_system.sopc+, so that is the file to preserve
+when creating a project archive or checking the project into
+a version control system.
+
+\clearpage
+% -----------------------------------------------------------------
+\subsection{Top-Level Design}
+% -----------------------------------------------------------------
+\label{sec:sopc_system_top_level}
+
+\lstset{language=Verilog}
+\begin{figure}
+\begin{center}
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+module sopc_system (
+    // 1) global signals:
+    clk,
+    reset_n,
+
+    // the_button_pio
+    in_port_to_the_button_pio,
+
+    // the_led_pio
+    out_port_from_the_led_pio
+);
+\end{lstlisting}
+\end{minipage}
+\end{center}
+\caption{SOPC Builder {\tt sopc\_system} top-level Verilog module.}
+\label{fig:sopc_system_verilog}
+\end{figure}
+%
+
+Figure~\ref{fig:sopc_system_verilog} shows the Verilog module 
+generated for the SOPC system component (buried inside the
+\verb+sopc_system.v+ file). So how should this component be used?
+
+SOPC Builder components can be used in one of two ways; the
+component can be considered {\em the top-level component}, or 
+the component can be considered just {\em one component} in a
+top-level design, i.e.,  a component that you instantiate
+in a top-level design. I encourage you to use the
+latter interpretation. Here is my argument;
+%
+\begin{itemize}
+%
+\item FPGA pin assignments are essentially invariant once the 
+device is placed-and-routed on a PCB. The design may contain
+multiple general purpose I/Os (GPIO), whose properties
+can be changed, but the wiring associated with GPIO bit 0
+in the schematic will always route to the same pin on the FPGA, 
+regardless of what you would like to name that signal within your
+specific Verilog project.
+%
+\item Design constraints for I/O signals are generally applied
+to the pin names of the signals. To avoid having to copy identical
+constraints between projects, it is convenient to define a
+top-level entity for a board with a fixed set of port names,
+along with a constraints file with the nominal constraints.
+Design-specific constraints can then either replace or augment
+the nominal constraints.
+%
+\item Figure~\ref{fig:sopc_system_verilog} shows the port names
+of the example SOPC system design. These port names depend on
+the SOPC system master and slave names. Any changes to the SOPC
+master and slave names results in port name changes.
+
+If the top-level SOPC component is used as your top-level design
+file, then the port names become the {\em pin names}.
+Pin constraints must then be applied to pin names that are
+being generated by SOPC Builder. This is a design maintenance 
+headache.
+
+By instantiating the SOPC component in a top-level component,
+you gain the advantage of being able to rename the ports to
+the standard pin names used for that particular board.
+
+Consider the case where a SOPC component output or input port is
+not used on a particular board. If the SOPC component is 
+instantiated in a top-level design, then you can leave unused
+outputs disconnected, and you can drive unused inputs to static values.
+You cannot do this if you use the SOPC component as the top-level
+design, as all ports become pins, and all pins need assignments
+(otherwise Quartus will assign default values that could be
+incorrect and result in damage to your board).
+
+You also gain the appreciation that the SOPC system is a
+reuseable component. For example, the SOPC system developed in
+this tutorial is instantiated in top-level designs for the
+BeMicro, BeMicro-SDK, and DE2 boards.
+
+\end{itemize}
+
+Because the SOPC system can be considered as a component, rather than
+a top-level design, it can be placed in its own source directory, 
+with a simulation testbench. A board design that instantiates the
+SOPC system then adds the source path to its project, 
+generates the Verilog source in a work directory, and uses that code
+for synthesis. The example source provided with this tutorial
+shows this approach.
+
+\vskip5mm
+{\bf Caveat}: An SOPC System {\em should} be able to be treated
+as a component, however, the \verb+.sopc+ file contains a
+reference to the FPGA device part number used when creating
+the system (the part number is displayed on the SOPC Builder GUI).
+The example code provided with this tutorial shows that a
+single SOPC system file can be used with multiple boards
+containing different devices. The SOPC System was designed
+targeting the BeMicro-SDK Cyclone IV E device, but is reused
+unchanged for the BeMicro Cyclone III and DE2 Cyclone II devices.
+The synthesis script for each board first copies
+\verb+sopc_system.sopc+ from the common area to the board-specific 
+project work directory. The script needs to do this, as SOPC Builder
+generates the output files in the same location as the SOPC file.
+The synthesis script then requests the user to start the SOPC
+Builder GUI and to {\em generate} the SOPC system files\footnote{I have
+not figured out how to automate this from Tcl. The Tcl shell 
+environment variables do not appear to be setup appropriately to
+{\tt exec} the command-line tool {\tt sopc\_builder}.}.
+The synthesis script request to generate the SOPC system occurs 
+before the device constraint has been setup, so the SOPC Builder
+GUI will always generate a warning that the device currently selected
+for the project, the Cyclone IV GX, does not match that in
+the SOPC file. The warning can be ignored.
+
+% -----------------------------------------------------------------
+\subsection{Synthesis}
+% -----------------------------------------------------------------
+\label{sec:sopc_system_synthesis}
+
+Now that we have established why you should {\em not} use the SOPC 
+system as the top-level entity, we will ignore that advice,
+and do it anyway. In the Quartus GUI, under the Project Navigator
+window (located on the top-left of the GUI), click on the 
+{\em Files} tab, and you should see the file \verb+sopc_system.qip+
+listed. If you do not,  add it using the 
+{\em Project$\rightarrow$Add/Remove Files in Project} menu.
+Right click on the file, and select {\em Set as Top-Level Entity},
+then synthesize the design (press the play button on the GUI).
+
+Figure~\ref{fig:sopc_system_hierarchy} shows the post-synthesis 
+hierarchy display for the SOPC system design (when 
+synthesized as the top-level design entity).
+The SOPC design uses a total of 986 LCs, with the majority used
+by the JTAG hub (\verb+sld_hub+, 99 LCs), and the JTAG master
+({\tt jtag\_master}, 816 LCs).
+The Qsys design uses a similar number of LCs.
+
+Before moving on, look at the Quartus II message window
+(bottom left of the GUI, with the {\em Processing} tab
+selected). Scroll up to the top of the messages, and then
+scroll down until you see the warning text (highlighted
+in blue). These warnings are generated by the Avalon-MM
+BFM component. This component is used in simulation only.
+The warnings appear because the authors of the BFM components
+have {\em not} used synthesis directives correctly.
+The Verilog source for the Avalon-MM BFM should have
+an Avalon-MM master interface for simulation, and another
+for synthesis. For synthesis, the Avalon-MM master interface
+signals should be driven to deasserted levels, allowing the
+synthesis tool to eliminate the logic (without generating
+warnings). However, as it is currently implemented, 
+Quartus generates a large number of
+warnings about missing drivers and dangling pins!\phantomsection\label{bug:2}
+
+% -----------------------------------------------------------------
+% SOPC System hierarchy
+% -----------------------------------------------------------------
+%
+% In Quartus, detach the window from the main GUI window and
+% scale it to the desired size. Then ctrl-alt-printscr
+%
+% Screen-shot saved with Paint to PNG
+\begin{landscape}
+\begin{figure}[p]
+  \begin{center}
+    \includegraphics[width=210mm]
+    {figures/sopc_system_hierarchy.png}
+  \end{center}
+  \caption{Quartus II hierarchy display for the
+  {\tt sopc\_system} design. The design uses 986 LCs, with
+  the bulk being used by the JTAG hub ({\tt sld\_hub}, 99 LCs)
+  and the JTAG-to-Avalon-MM master ({\tt jtag\_master}, 816 LCs).}
+  \label{fig:sopc_system_hierarchy}
+\end{figure}
+\end{landscape}
+
+% -----------------------------------------------------------------
+\subsection{Simulation}
+% -----------------------------------------------------------------
+\label{sec:sopc_system_simulation}
+
+The SOPC System design can be simulated using two possible methods;
+use the Avalon-MM master BFM documented in the Verification IP
+Guide, or live-on-the-edge and use the completely undocumented
+Verilog tasks hidden deep within the JTAG-to-Avalon-MM master 
+implementation. The following sections describe both methods.
+
+% -----------------------------------------------------------------
+\subsubsection{SOPC Builder {\tt test\_bench}}
+% -----------------------------------------------------------------
+\label{sec:sopc_system_test_bench}
+
+The observant user would have noticed that SOPC Builder has a simulate
+option; what does that do? Open up the SOPC Builder GUI, click
+on the {\em System Generation} tab, and check the {\em Simulation.
+Create project simulator files.} check-box. Check that Modelsim-ASE
+is setup by using {\em Tools$\rightarrow$Options},
+highlighting {\em HDL Simulator}, and for the simulator
+{\em Mentor Graphic's Modelsim-Altera} set the {\em Application Path},
+eg., \verb+c:\software\altera\11.1sp1\modelsim_ase\win32aloem+,
+and click {\em Finish}. Now click the {\em Run Simulator} button.
+You will get an error about a missing \verb+.mpf+ file (this is
+the Modelsim project file); the {\em Run Simulator} button should
+not really be highlighted until the \verb+.mpf+ file is
+present in the project\phantomsection\label{bug:3}. To create the file, 
+click the SOPC Builder {\em Generate} button, and then once 
+generation completes, click the {\em Run Simulator} button. 
+
+{\em Run Simulator} starts Modelsim-ASE, 
+changes directory to \verb+$TUTORIAL/sopc/sopc_system_sim+ directory, and
+loads the project file. The Modelsim command \verb+where+ can be
+used to display the current directory and project.
+The SOPC system simulation is controlled by Tcl procedures defined
+in the script \verb+setup_sim.do+. Open the script and look at
+the Tcl commands (they are far from easy to read); the Tcl commands
+determine if the version of Modelsim is the Altera Edition or not, sets up a 
+\verb+vsim+ (simulator) command to run on a component 
+called \verb+test_bench+, and creates commands to build library 
+components and the \verb+sopc_system.v+ file. 
+
+At the Modelsim console type \verb+do setup_sim.do+ to
+source the Tcl procedures defined in the
+script. Figure~\ref{fig:sopc_system_setup_sim} shows the Modelsim
+console output generated by the script. Type the command
+\verb+s+ to build the components and load the simulation.
+The simulation should load without errors, alas, Modelsim
+fails with the message \verb+# Error loading design+
+(along with a message that the design unit for the
+\verb+altera_avalon_mm_master_bfm+ could not be found)\phantomsection\label{bug:4}.
+The simulation files generated by Quartus 11.1sp1 do not
+include the Avalon-MM BFM source files (earlier versions of
+Quartus work fine). The problem can be rectified by editing
+\verb+setup_sim.do+ to add the BFM source files inside the
+alias for the \verb+s+ command, i.e., change the code to
+%
+\begin{verbatim}
+alias s "vlib work;
+_init_setup
+
+vlog -sv [file join $env(QUARTUS_ROOTDIR)]/../ip/altera/sopc_builder_ip/
+verification/lib/verbosity_pkg.sv
+vlog -sv [file join $env(QUARTUS_ROOTDIR)]/../ip/altera/sopc_builder_ip/
+verification/lib/avalon_mm_pkg.sv
+vlog -sv [file join $env(QUARTUS_ROOTDIR)]/../ip/altera/sopc_builder_ip/
+verification/altera_avalon_mm_master_bfm/altera_avalon_mm_master_bfm.sv
+ 
+vlog +incdir+.. ../sopc_system.v;
+\end{verbatim}
+%
+(where the start and end of this script segment already exist in the file, and
+each \verb+vlog+ command is on one line, i.e., 3 new lines are added
+to the script).
+After editing \verb+setup_sim.do+, type \verb+do setup_sim.do+ at
+the Modelsim prompt to read the modified script, and then
+\verb+s+ to build the simulation files.
+This time, the command completes without error (there is a
+warning about \verb+onchip_ram+ not being initialized, but
+that can be ignored).
+
+% -----------------------------------------------------------------
+% setup_sim.do commands
+% -----------------------------------------------------------------
+\begin{figure}[p]
+\begin{center}
+\begin{minipage}{0.8\textwidth}
+\begin{verbatim}
+# @@ setup_sim.do 
+# @@ 
+# @@ Defined aliases: 
+# @@ 
+# @@ s -- Load all design (HDL) files. 
+# @@ re-vlog/re-vcom and re-vsim the design. 
+# @@ 
+# @@ s_cycloneiv -- For Modelsim SE, compile Cyclone IV models. 
+# @@ (Ignored in Modelsim AE.) 
+# @@ 
+# @@ s_stratixiv -- For Modelsim SE, compile Stratix IV models. 
+# @@ (Ignored in Modelsim AE.) 
+# @@ 
+# @@ s_stratixv -- For Modelsim SE, compile Stratix V models. 
+# @@ (Ignored in Modelsim AE.) 
+# @@ 
+# @@ w -- Sets-up waveforms for this design 
+# @@ Each SOPC-Builder component may have 
+# @@ signals 'marked' for display during 
+# @@ simulation. This command opens a wave- 
+# @@ window containing all such signals. 
+# @@ 
+# @@ l -- Sets-up list waveforms for this design 
+# @@ Each SOPC-Builder component may have 
+# @@ signals 'marked' for listing during 
+# @@ simulation. This command opens a list- 
+# @@ window containing all such signals. 
+# @@ 
+# @@ h -- print this message 
+# @@ 
+\end{verbatim}
+\end{minipage}
+\end{center}
+  \caption{SOPC system Modelsim setup script ({\tt setup\_sim.do}) Tcl commands.}
+  \label{fig:sopc_system_setup_sim}
+\end{figure}
+% -----------------------------------------------------------------
+
+\clearpage
+Load the Modelsim wave window with the default SOPC system signals
+by typing the \verb+w+ command; this populates the wave window with the
+\verb+onchip_ram+ signals. Not very exiting is it?
+Type \verb+add wave *+ to add the clock, reset, LED output, and button input
+signals. Type \verb+run 1 us+ to run the simulation for 1$\mu$s.
+In the Modelsim console, you will see a message output by the
+Avalon-MM master BFM. Look at the wave window, and zoom to show
+the simulation time from 0 to 1us (by clicking on the magnifying 
+glass with the solid blue center). What happened in
+the wave window? Well, if we had not added the clock and reset, 
+a whole lot of nothing (well, 1$\mu$s of nothing really)!
+By adding the reset and clock, at least we see some activity. 
+
+This exercise shows that there is {\em no free lunch}; just because
+SOPC Builder has a simulate button, does not mean it will write your
+simulation testbench for you, all it does is provide the infrastructure for
+{\em you} to write your simulation testbench.
+
+To see what infrastructure Altera provides, open up the \verb+sopc_system.v+
+file and scroll to the bottom of it. There are a couple of things to
+observe;
+%
+\begin{itemize}
+\item There is a module called \verb+test_bench+. This is the testbench
+that you just simulated in Modelsim. The testbench contains a clock
+generator, a reset generator, and the device under test; the SOPC system
+component. Not much of a testbench really.
+%
+\item In the Verilog source, above the \verb+test_bench+ component,
+Verilog \verb+include+ statements are used to inline a mixture of code
+from the Quartus install directory, code copied to the project 
+directory, and generated code. Appendix~\ref{app:altera_bugs} 
+Notes 5\phantomsection\label{bug:5} and 6\phantomsection\label{bug:6a}
+have comments on the disadvantages of using this technique to
+resolve source code dependencies.
+
+The Tcl simulation script described in Section~\ref{sec:sopc_system_tcl_scripts}
+uses the \verb+vsim+ \verb|+incdir+| command line option to compile
+the source that is \verb+include+'d inline in the Verilog source.
+For this simulation to work, make sure to check the {\em Simulation}
+check box under the {\em System Generation} tab in the SOPC Builder GUI.
+\end{itemize}
+
+So how then do we simulate this system? The Altera Verification IP
+suite shows you one option; you create your own testbench and then
+instantiate \verb+test_bench+ as the clock and reset generator.
+Personally, I do not like that solution, as you lose control of
+the reset line. Rather, I recommend ignoring \verb+test_bench+ 
+entirely. The only useful simulation code that SOPC Builder 
+generates are some of the script commands within \verb+setup_sim.do+;
+the lines of code telling you the paths to the components included
+in the project, and the arguments to the \verb+vsim+ command to
+get the simulation to run (without generating lots of warnings).
+
+\clearpage
+% -----------------------------------------------------------------
+\subsubsection{Avalon-MM Master BFM}
+% -----------------------------------------------------------------
+
+The source code for the Avalon-MM master BFM testbench is
+located at;
+%
+\begin{verbatim}
+$TUTORIAL/hdl/sopc_system/test/sopc_system_bfm_master_tb.sv
+\end{verbatim}
+%
+This testbench uses the Altera Verification IP Suite to generate
+Avalon-MM master transactions.
+
+The Avalon-MM master BFM testbench can be simulated as follows;
+%
+\begin{itemize}
+\item Start Modelsim.
+
+This can be performed from the SOPC Builder GUI by clicking on
+the {\em Run Simulator} button or you can run the simulator directly.
+
+\item Set the tutorial path variable
+%
+\begin{verbatim}
+Modelsim> set TUTORIAL c:/temp/altera_jtag_to_avalon_mm_tutorial
+\end{verbatim}
+%
+\item If you did not start Modelsim from the SOPC Builder GUI,
+change directory to the SOPC simulation directory and reset the
+work library mapping
+%
+\begin{verbatim}
+Modelsim> cd $TUTORIAL/sopc/sopc_system_sim
+Modelsim> vmap work work
+\end{verbatim}
+%
+The first argument to \verb+vmap+ is the library name, and
+the second is the path to that library, i.e., the command
+maps the \verb+work+ library to the \verb+work/+
+directory in the current directory.
+%
+\item Compile the SOPC Builder source
+%
+\begin{verbatim}
+Modelsim> do setup_sim.do
+Modelsim> s
+\end{verbatim}
+%
+This step will only succeed if the script has been edited per
+the instructions in the previous section.
+%
+\item Compile the testbench
+%
+\begin{verbatim}
+VSIM> vlog -sv $TUTORIAL/hdl/sopc_system/test/sopc_system_bfm_master_tb.sv
+\end{verbatim}
+%
+\item Run the simulation 
+%
+\begin{verbatim}
+VSIM> vsim -t ps +nowarnTFMPC sopc_system_bfm_master_tb
+VSIM> do $TUTORIAL/hdl/sopc_system/scripts/sopc_system_bfm_master_tb.do
+VSIM> run -a
+\end{verbatim}
+%
+where the \verb+vsim+ \verb|+nowarnTFMPC| option suppresses warnings 
+about missing connections (this argument was copied from \verb+setup_sim.do+),
+and the \verb+.do+ file populates the wave window.
+%
+\item Modify the testbench source, recompile, and rerun the simulation via
+%
+\begin{verbatim}
+VSIM> vlog -sv $TUTORIAL/hdl/sopc_system/test/sopc_system_bfm_master_tb.sv
+VSIM> restart -f; run -a
+\end{verbatim}
+%
+\end{itemize}
+
+Figure~\ref{fig:sopc_system_bfm_master_tb} shows the Modelsim console
+output produced by the testbench. The testbench checks the operation of the
+LEDs, push buttons, and several locations in RAM. The testbench code
+contains SystemVerilog assertions that would have generated an error
+message for any failed test.
+
+
+\begin{figure}
+\begin{center}
+\begin{minipage}{0.8\textwidth}
+\begin{verbatim}
+# ==============================================================
+# JTAG-to-Avalon-MM SOPC System Testbench (using the BFM master)
+# ==============================================================
+#  * Deassert reset
+# 
+# --------------------------------------------------------------
+# 1: Test the LEDs.
+# --------------------------------------------------------------
+#  * Write 0xAA to the LEDs
+#    - LED register value = aah
+#    - LED port value = aah
+#  * Walking 1's test
+#    - LED port value = 01h
+#    - LED port value = 02h
+#    - LED port value = 04h
+#    - LED port value = 08h
+#    - LED port value = 10h
+#    - LED port value = 20h
+#    - LED port value = 40h
+#    - LED port value = 80h
+# 
+# --------------------------------------------------------------
+# 2: Test the push buttons.
+# --------------------------------------------------------------
+#  * Push button value = 55h
+#  * Walking 1's test
+#    - Push button value = 01h
+#    - Push button value = 02h
+#    - Push button value = 04h
+#    - Push button value = 08h
+#    - Push button value = 10h
+#    - Push button value = 20h
+#    - Push button value = 40h
+#    - Push button value = 80h
+# 
+# --------------------------------------------------------------
+# 3: Test the on-chip RAM.
+# --------------------------------------------------------------
+#  * Fill 1024 locations of RAM with an incrementing count
+#  * Read and check the RAM
+# 
+# ==============================================================
+# Simulation complete.
+# ==============================================================
+\end{verbatim}
+\end{minipage}
+\end{center}
+  \caption{Modelsim console output for the SOPC Builder
+  Avalon-MM BFM master testbench,
+  {\tt sopc\_system\_bfm\_master\_tb}.}
+  \label{fig:sopc_system_bfm_master_tb}
+\end{figure}
+
+\clearpage
+% -----------------------------------------------------------------
+\subsubsection{JTAG-to-Avalon-MM Master}
+% -----------------------------------------------------------------
+
+Using only the Avalon-MM BFM master to test your design violates 
+the principle
+%
+\begin{quote}
+{\em ``Test what you fly, and fly what you test''}
+\end{quote}
+%
+The main idea of the principle that you should {\em test what you 
+use}. Using the Avalon-MM BFM to generate Avalon-MM transactions
+{\em does not} test the JTAG-to-Avalon-MM master logic,
+which is what generates the Avalon-MM master transactions in the
+actual hardware. How then can you be sure that your hardware design
+will function correctly? Arguably, you could test individual
+components using the Avalon Verification IP suite, which would
+then give you higher confidence that the components within the
+system are functionally correct. The final SOPC system should still
+have its own testbench, since the system has a {\em fabric} that is
+specific to the design. So, lets use the Verification IP suite to test
+the JTAG-to-Avalon Master $\dots$ Oh, but there is no documented way to
+simulate the JTAG-to-Avalon-MM master interface, bummer.
+We won't let the lack of documentation stop us though, continue 
+reading!
+
+The Altera wiki entry
+\href{http://www.alterawiki.com/wiki/Avalon-ST_JTAG_Interface_PLI_Simulation_Mode}
+{Avalon-ST\_JTAG\_Interface\_PLI\_Simulation\_Mode} shows
+how to exercise the JTAG-to-Avalon-MM master in simulation using Verilog PLI
+(Programming Language Interface). The PLI method uses a socket connection
+between System Console and Modelsim, and {\em magically} (the code
+is hidden in a Java library) generates transactions within the testbench.
+While the PLI interface could be useful for some applications,
+eg., developing a software interface, it is not appropriate for
+use in self-verifying (automated) testbenches.
+%
+A self-verifying testbench should run completely within the Modelsim 
+simulator, and the easiest way to do that, is to implement the testcase 
+generator, the assertion logic, and the device under test using a
+hardware description language.
+
+The JTAG-to-Avalon-MM master consists of a JTAG-to-Avalon-ST interface
+that converts JTAG transactions into byte streams in and out of the 
+design, bytes-to-packets conversion logic that encodes and decodes
+a binary protocol transported over the byte streams.
+The binary protocol encodes whether to perform an Avalon-MM read or 
+write transaction, and the response for each transaction type.
+The packets to transactions component converts the commands
+into Avalon-MM master commands.
+The JTAG-to-Avalon-ST, bytes-to-packets, packets-to-transactions,
+packets-to-bytes, and JTAG-to-Avalon-MM components are only
+partially documented in the Altera literature. 
+See~\cite{Hawkins_Altera_JTAG_to_Avalon_Analysis_2012} for
+a detailed analysis of the JTAG-to-Avalon components.
+
+The analysis document~\cite{Hawkins_Altera_JTAG_to_Avalon_Analysis_2012}
+shows that buried deep within the source code for the JTAG-to-Avalon-ST
+component is the logic for the JTAG node (which connects to the JTAG hub).
+Hidden within the JTAG node are Verilog tasks for performing low-level
+JTAG operations. Figure~\ref{fig:sopc_system_sld_node} shows the path 
+to the JTAG node in the testbench developed for this section.
+The JTAG node is highlighted in the figure, and the node's Verilog 
+tasks are listed beneath it.
+If you know how to generate JTAG transactions, and know how to 
+use them to generate byte streams, then you have the makings of 
+a JTAG-to-Avalon-MM master simulation. I won't bore you with the
+details, the morbidly curious can read the testbench code and 
+the analysis document.
+
+The source code for the JTAG-to-Avalon-MM master testbench is
+located at;
+%
+\begin{verbatim}
+$TUTORIAL/hdl/sopc_system/test/sopc_system_jtag_master_tb.sv
+\end{verbatim}
+%
+This testbench uses the undocumented Verilog tasks in the JTAG node
+to generate byte-streams which encode Avalon-MM master transactions
+for the packets-to-transactions component.
+
+% -----------------------------------------------------------------
+% JTAG-to-Avalon-MM bridge path to the SLD node
+% -----------------------------------------------------------------
+%
+% Compile the sopc_system_jtag_master_tb.sv file.
+%
+% Detach the Modelsim window, scale to the desired size, highlight
+% the JTAG node, capture the window using ctrl-alt-printsrc, and
+% paste into Paint. Save as PNG.
+%
+\begin{figure}[p]
+  \begin{center}
+    \includegraphics[width=0.95\textwidth]{figures/sopc_altera_jtag_sld_node_hierarchy.png}
+  \end{center}
+  \caption{Altera JTAG node location in the SOPC Builder
+  JTAG-to-Avalon-MM master testbench,
+  {\tt sopc\_system\_jtag\_master\_tb}. The tasks under the
+  highlighted JTAG {\tt node}, i.e., {\tt reset\_jtag\_state} down
+  to {\tt shift\_one\_bit},
+  are used to simulate the JTAG-to-Avalon-MM bridge.}
+  \label{fig:sopc_system_sld_node}
+\end{figure}
+% -----------------------------------------------------------------
+
+\clearpage
+The JTAG-to-Avalon-MM master testbench can be simulated as follows;
+%
+\begin{itemize}
+\item Start Modelsim.
+
+This can be performed from the SOPC Builder GUI by clicking on
+the {\em Run Simulator} button or you can run the simulator directly.
+
+\item Set the tutorial path variable
+%
+\begin{verbatim}
+Modelsim> set TUTORIAL c:/temp/altera_jtag_to_avalon_mm_tutorial
+\end{verbatim}
+%
+\item If you did not start Modelsim from the SOPC Builder GUI,
+change directory to the SOPC simulation directory and reset the
+work library mapping
+%
+\begin{verbatim}
+Modelsim> cd $TUTORIAL/sopc/sopc_system_sim
+Modelsim> vmap work work
+\end{verbatim}
+%
+The first argument to \verb+vmap+ is the library name, and
+the second is the path to that library, i.e., the command
+maps the \verb+work+ library to the \verb+work/+
+directory in the current directory.
+%
+\item Compile the SOPC Builder source
+%
+\begin{verbatim}
+Modelsim> do setup_sim.do
+Modelsim> s
+\end{verbatim}
+%
+This step will only succeed if the script has been edited per
+the instructions in Section~\ref{sec:sopc_system_test_bench}.
+%
+\item Compile the testbench
+%
+\begin{verbatim}
+VSIM> vlog -sv $TUTORIAL/hdl/sopc_system/test/sopc_system_jtag_master_tb.sv
+\end{verbatim}
+%
+\item Run the simulation 
+%
+\begin{verbatim}
+VSIM> vsim -t ps +nowarnTFMPC sopc_system_jtag_master_tb
+VSIM> do $TUTORIAL/hdl/sopc_system/scripts/sopc_system_jtag_master_tb.do
+VSIM> run -a
+\end{verbatim}
+%
+where the \verb+vsim+ \verb|+nowarnTFMPC| option suppresses warnings 
+about missing connections (this argument was copied from \verb+setup_sim.do+),
+and the \verb+.do+ file populates the wave window.
+%
+\item Modify the testbench source, recompile, and rerun the simulation via
+%
+\begin{verbatim}
+VSIM> vlog -sv $TUTORIAL/hdl/sopc_system/test/sopc_system_jtag_master_tb.sv
+VSIM> restart -f; run -a
+\end{verbatim}
+%
+\end{itemize}
+%
+The JTAG-to-Avalon-MM master testbench reproduces the test sequences 
+performed by the Avalon-MM BFM master testbench shown in 
+Figure~\ref{fig:sopc_system_bfm_master_tb}. The JTAG-to-Avalon-MM
+master testbench console output is slightly different, as the
+testbench first performs a JTAG protocol test, and then
+duplicates the Avalon-MM BFM master testbench sequences.
+The run-time of the JTAG testbench is much longer than that of the 
+Avalon-MM BFM master testbench, due to the fact that the JTAG clock
+is slower than the Avalon-MM clock, and byte stream transactions 
+are serialized over JTAG. In practice, you should use the 
+Avalon-MM BFM master for performing exhaustive tests on Avalon-MM 
+slaves, and perform token tests with the JTAG simulation interface
+to check that devices are connected correctly. Thus we finally 
+reach our goal of {\em testing what we fly}.
+
+\clearpage
+% -----------------------------------------------------------------
+\subsection{Synthesis and Simulation Scripts}
+% -----------------------------------------------------------------
+\label{sec:sopc_system_tcl_scripts}
+
+Up until this point, you have been entering commands
+in the Quartus or Modelsim console. What happens when you get bored
+with typing, or forget the commands? Surely there is an easier way?
+Yes, there is! Tcl scripts.
+
+The BeMicro-SDK SOPC system project directory is located at;
+%
+\begin{verbatim}
+$TUTORIAL/hdl/boards/bemicro_sdk/sopc_system/
+\end{verbatim}
+%
+The project directory contains the synthesis script \verb+scripts/synth.tcl+,
+and the top-level design file \verb+src/bemicro_sdk.sv+ (with the
+SOPC system instantiated as a component).
+The synthesis script can be run by starting Quartus, selecting
+the Tcl console (if you cannot see it in the GUI, make it visible
+using {\em View}$\rightarrow${\em Utility Windows}$\rightarrow${\em Tcl Console}),
+changing to the project directory, and running the script, i.e.,
+at the Quartus Tcl prompt
+%
+\begin{verbatim}
+tcl> set TUTORIAL c:/temp/altera_jtag_to_avalon_mm_tutorial
+tcl> cd $TUTORIAL/hdl/boards/bemicro_sdk/sopc_system/
+tcl> source scripts/synth.tcl
+\end{verbatim}
+%
+The script will determine that the SOPC System needs to be
+generated. I have not figured out how to automate that from Tcl,
+so the script asks you to run SOPC Builder, and {\em generate}
+the SOPC system. Generate the system, and then exit the SOPC Builder GUI.
+In the Tcl console, press the up-arrow to bring back the last 
+command, and re-run the script. Quartus will then synthesize the
+design. The top-level design connects 7-bits of the LED control
+register to 7 of the 8 LEDs on the board, and blinks the other
+LED at about 1Hz (so you can see the board is alive).
+Thus implementing the design has been reduced to a few
+Tcl commands and GUI button clicks---much less to remember!
+
+The SOPC System simulations also have a Tcl script that will
+setup the simulator without having to run the \verb+setup_sim.do+
+script generated by Quartus.
+%
+The SOPC system simulation project directory is located at;
+%
+\begin{verbatim}
+$TUTORIAL/hdl/sopc_system/
+\end{verbatim}
+%
+That directory contains a \verb+scripts/+ directory containing
+the simulation script \verb+sim.tcl+.
+The simulation script can be run by starting Modelsim,
+changing to the project directory, and running the script, i.e.,
+%
+\begin{verbatim}
+ModelSim> set TUTORIAL c:/temp/altera_jtag_to_avalon_mm_tutorial
+ModelSim> cd $TUTORIAL/hdl/sopc_system/
+ModelSim> source scripts/sim.tcl
+\end{verbatim}
+%
+The script will determine whether the SOPC System needs to be
+generated (remember, Quartus generates code, so the simulation
+needs to compile the generated code). The script is configured
+to look for the SOPC system in the BeMicro-SDK project directory.
+If it does not find it, it asks you to run Quartus to generate
+it (which can be done using the \verb+synth.tcl+ script following
+the sequence just described). Once the simulation script finds the Quartus
+generated source, it compiles the testbenches, and creates two
+Tcl procedures with the same names as the testbenches.
+Either testbench can be run by typing the procedure name.
+Each procedure issues the \verb+vsim+ command, populates the
+wave window, and runs the simulation (see the script
+for the procedure implementations). Again, much less typing!
+
+The nice thing about the synthesis and simulation scripts is
+that they show you the {\em minimum} number of source files needed
+to reproduce both the Quartus and Modelsim projects. These are
+the source files that you check into a code versioning system
+(along with the synthesis and simulation scripts).
+
+\clearpage
+% =================================================================
+\section{Qsys Design Flow}
+% =================================================================
+
+In the following sections, I show how to use the Qsys tool to
+create a system, and then how to simulate it. Qsys is Altera's
+the {\em new-and-improved} replacement for SOPC Builder. 
+Reproducing the SOPC Builder design using Qsys helps contrast
+the tools, and provides the reader with a reference design when
+porting their own SOPC system designs to Qsys.
+
+% -----------------------------------------------------------------
+\subsection{Project Creation}
+% -----------------------------------------------------------------
+
+Start Quartus 11.1sp1 and create a new project targeting the BeMicro-SDK board;
+\begin{itemize}
+\item File$\rightarrow$New Project Wizard
+\item {\em Directory, Name, Top-level Entity [page 1 of 5]}
+\begin{itemize}
+\item Working directory name: \verb+c:\temp\altera_jtag_to_avalon_mm_tutorial\qsys\+
+\item Project and top-level entity name: \verb+tutorial+
+\item Click {\em Next}
+\item Click {\em Yes} when prompted to create the working directory
+\end{itemize}
+%
+\item {\em Add Files [page 2 of 5]}
+\begin{itemize}
+\item Click {\em Next}
+\end{itemize}
+%
+\item {\em Family \& Device Settings [page 3 of 5]}
+\begin{itemize}
+\item Device Family: use the pull-down menu to select \verb+Cyclone IV E+
+\item In the Available Devices spreadsheet, select \verb+EP4CE22F17C7+
+\item Click {\em Next}
+\end{itemize}
+%
+\item Click {\em Finish}, leaving all other settings at their defaults
+\end{itemize}
+
+\clearpage
+% -----------------------------------------------------------------
+\subsection{Qsys Component}
+% -----------------------------------------------------------------
+
+% -----------------------------------------------------------------
+% Qsys system screenshot
+% -----------------------------------------------------------------
+%
+% Screen-shot saved with Paint to PNG
+\begin{figure}[t]
+  \begin{center}
+    \includegraphics[width=0.95\textwidth]{figures/qsys_system.png}
+  \end{center}
+  \caption{Qsys {\tt qsys\_system} design.}
+  \label{fig:qsys_system}
+\end{figure}
+% -----------------------------------------------------------------
+
+Start Qsys and create the system shown in Figure~\ref{fig:qsys_system};
+%
+\begin{itemize}
+\item Tools$\rightarrow$Qsys
+\item The Qsys GUI starts up with a {\em Clock Source} already populated.
+Right click, and rename it \verb+clk+.
+%
+\item Add the Qsys components from the {\em Component Library};
+\begin{itemize}
+%
+\item Add the Avalon-MM BFM master;
+\begin{itemize}
+\item Verification$\rightarrow$Simulation$\rightarrow$Altera Avalon-MM Master BFM
+
+For previous versions of Quartus use;\newline
+Avalon Verification Suite$\rightarrow$Altera Avalon-MM Master BFM
+\item Uncheck {\em Use the burstcount signal} and click finish.
+\item Right click on the component and rename it \verb+bfm_master+.
+\end{itemize}
+%
+\item Add the JTAG-to-Avalon-MM master;
+\begin{itemize}
+\item Bridges$\rightarrow$Memory Mapped$\rightarrow$JTAG to Avalon Master Bridge
+
+For previous versions of Quartus use;\newline
+Bridges and Adapters$\rightarrow$Memory Mapped$\rightarrow$JTAG to Avalon Master Bridge
+\item Accept the defaults, and click finish.
+\item Right click on the component and rename it \verb+jtag_master+.
+\item Export the \verb+master_reset+ signal to the top-level, by clicking on the
+{\em Click to export} text in the {\em Export} column,
+{\em Reset Output} row, and enter the name \verb+resetrequest+.
+This creates the top-level port \verb+resetrequest_reset+ on
+the Qsys system (which can be viewed on the {\em HDL Example}
+tab). This signal is an output from the JTAG master that is intended
+for use as a JTAG controlled reset source (the hardware examples
+instead use this signal to control an LED).
+\end{itemize}
+%
+\item Add the LED parallel I/O slave;
+\begin{itemize}
+\item Peripherals$\rightarrow$Microcontroller Peripherals$\rightarrow$PIO
+(Parallel I/O).
+\item Accept the defaults, and click finish.
+\item Right click on the component and rename it \verb+led_pio+.
+\item Export the I/O to the top-level, by clicking on the
+{\em Click to export} text in the {\em Export} column,
+{\em Conduit Endpoint} row, and enter the name \verb+led+.
+This creates the top-level port \verb+led_export+ on
+the Qsys system (which can be viewed on the {\em HDL Example}
+tab).
+\item Connect the slave to the two masters; it will be assigned the base 
+address \verb+0x00000000+.
+\end{itemize}
+%
+\item Add the button parallel I/O slave;
+\begin{itemize}
+\item Peripherals$\rightarrow$Microcontroller Peripherals$\rightarrow$PIO
+(Parallel I/O).
+\item Change the direction to {\em input}, and click finish.
+\item Right click on the component and rename it \verb+button_pio+.
+\item Export the I/O to the top-level, by clicking on the
+{\em Click to export} text in the {\em Export} column,
+{\em Conduit Endpoint} row, and enter the name \verb+button+.
+This creates the top-level port \verb+button_export+ on
+the top-level Qsys system (which can be viewed on the {\em HDL Example}
+tab).
+\item Connect the slave to the two masters; and change its base address to
+\verb+0x00000010+.
+\end{itemize}
+%
+\item Add the on-chip memory slave;
+\begin{itemize}
+\item Memories and Memory Controllers$\rightarrow$On-chip$\rightarrow$On-chip
+Memory (RAM or ROM).
+\item Uncheck {\em Initialize memory content}, and click finish.
+\item Right click on the component and rename it \verb+onchip_ram+.
+\item Connect the slave to the two masters; and change its base address to
+\verb+0x00001000+.
+\end{itemize}
+%
+\end{itemize}
+%
+\item Connect the clock and reset signals;
+\begin{itemize}
+\item Connect the {\em Clock Source} component (\verb+clk+) {\em Clock Output}
+(\verb+clk+)  to the clock input on each of the Avalon-MM masters and slaves.
+\item Connect the {\em Clock Source} component (\verb+clk+ ) {\em Reset Output}
+(\verb+clk_reset+) to the reset input on each of the Avalon-MM masters and slaves.
+\end{itemize}
+%
+\item The Qsys system should now look like that in Figure~\ref{fig:qsys_system}.
+The warnings shown in the Qsys GUI can be ignored.
+%
+\item Click on the {\em Generation} tab. Uncheck {\em Create block symbol
+file (.bsf)}, then click the {\em Generate} button to generate the system.
+
+Qsys generates a pop-up asking if you want to save changes to \verb+unnamed+.
+Click {\em Save} and enter the system name; \verb+qsys_system.qsys+. 
+
+\item When the message {\em Generate Complete. 0 Errors, 3 Warnings} appears, click 
+the {\em Close} button, and then close the GUI using File$\rightarrow$Exit.
+
+\end{itemize}
+%
+The Qsys system files are generated in a directory called \verb+qsys_system+.
+This is an improvement over SOPC Builder, which would generate many of
+the system files in the top-level of the Quartus work directory.
+The top-level Qsys system module is located in the file
+%
+\begin{verbatim}
+qsys_system/synthesis/qsys_system.v
+\end{verbatim}
+%
+This file is an improvement over that generated by SOPC Builder in that it
+contains only the \verb+sopc_system+ component module, making it easier to
+comprehend. If you check the simulation option in the generate tab, 
+and re-generate the system, another version of the file is created in
+%
+\begin{verbatim}
+qsys_system/simulation/qsys_system.v
+\end{verbatim}
+%
+and while the two files appear to be very similar, unfortunately, the code
+generator generates the Verilog code in a different order, making it impossible
+to compare the synthesis and simulation versions to determine actual code
+differences. 
+On a more positive note, Qsys does not use Verilog \verb+include+ 
+statements, so that is another improvement over SOPC Builder
+(see Appendix~\ref{app:altera_bugs} Note 5\phantomsection\label{bug:5}
+for the SOPC Builder discussion).
+
+The Qsys generated directories
+%
+\begin{verbatim}
+qsys_system/synthesis/submodules
+qsys_system/simulation/submodules
+\end{verbatim}
+%
+contain {\em copies} of Quartus II installation library code 
+(eg., the JTAG node, \verb+altera_jtag_sld_node.v+, which is used for 
+JTAG-to-Avalon-MM master simulation). Appendix~\ref{app:altera_bugs} 
+Note 6\phantomsection\label{bug:6b} discusses the disadvantages of 
+copying what is essentially library source code into a project.
+
+The Qsys system description is implemented in the XML file \verb+qsys_system.qsys+.
+As with SOPC Builder, all of the generated files can be considered as
+{\em intermediate} files; these files can be deleted and regenerated.
+Go ahead and delete all of the Qsys files and directories, 
+except for \verb+qsys_system.qsys+. Open the Qsys GUI, you will
+be prompted for a system file, select \verb+qsys_system.qsys+,
+and you will see the Qsys system unchanged. Select the {\em Generation}
+tab, and then click the {\em Generate} button to regenerate the system.
+
+\vskip5mm
+{\bf Caveat}:\phantomsection\label{bug:7} 
+When you select the {\em Generate} tab, you may notice that
+the {\em Create block symbol file} check-box is checked again. The
+settings selected on the {\em Generate} page are not preserved
+in the \verb+.qsys+ file. See Appendix~\ref{app:altera_bugs}
+Note 7 for a discussion.
+
+\clearpage
+% -----------------------------------------------------------------
+\subsection{Top-Level Design}
+% -----------------------------------------------------------------
+
+Figure~\ref{fig:qsys_system_verilog} shows the top-level Qsys system
+module port definitions from {\tt qsys\_system/synthesis/ qsys\_system.v};
+the naming convention is a bit redundant isn't it?\phantomsection\label{bug:8} 
+It seems kind of pointless that Altera allows you to define
+a port name in the {\em Export} column in Figure~\ref{fig:qsys_system},
+and then they go and munge the names to produce the port names in
+Figure~\ref{fig:qsys_system_verilog}. From the comments after each port,
+it appears that Altera's port naming convention is a mapping of a SystemVerilog
+interface definition into a Verilog compatible port name.
+
+% -----------------------------------------------------------------
+% Qsys system Verilog module
+% -----------------------------------------------------------------
+%
+\lstset{language=Verilog}
+\begin{figure}[t]
+\begin{center}
+\begin{minipage}{0.9\textwidth}
+\begin{lstlisting}
+module qsys_system (
+    output wire       resetrequest_reset, // resetrequest.reset
+    output wire [7:0] led_export,         //          led.export
+    input  wire [7:0] button_export,      //       button.export
+    input  wire       reset_reset_n,      //        reset.reset_n
+    input  wire       clk_clk             //          clk.clk
+);
+\end{lstlisting}
+\end{minipage}
+\end{center}
+\caption{Qsys {\tt qsys\_system} top-level Verilog module.}
+\label{fig:qsys_system_verilog}
+\end{figure}
+%
+
+% -----------------------------------------------------------------
+\subsection{Synthesis}
+% -----------------------------------------------------------------
+
+Section~\ref{sec:sopc_system_top_level} discusses the reasons why
+an SOPC System or Qsys System should not be used as a top-level
+component. Section~\ref{sec:sopc_system_synthesis} ignores that
+advice to gauge the logic utilization of the system. 
+We repeat that procedure here, to determine the Qsys system
+logic utilization.
+
+In the Quartus GUI, under the Project Navigator window 
+(located on the top-left of the GUI), click on the 
+{\em Files} tab, and then add the Qsys IP file
+\verb+qsys_system.qip+ using the 
+{\em Project$\rightarrow$Add/Remove Files in Project} menu.
+Right click on the file, and select {\em Set as Top-Level Entity},
+then synthesize the design (press the play button on the GUI).
+
+Figure~\ref{fig:qsys_system_hierarchy} shows the post-synthesis 
+hierarchy display for the Qsys system design (when 
+synthesized as the top-level design entity).
+The Qsys design uses a total of 1058 LCs, with the majority used
+by the JTAG hub (\verb+sld_hub+, 99 LCs), and the JTAG master
+({\tt jtag\_master}, 811 LCs). Figure~\ref{fig:sopc_system_hierarchy}
+shows that the SOPC system design uses a similar number of LCs.
+
+% -----------------------------------------------------------------
+% Qsys System hierarchy
+% -----------------------------------------------------------------
+%
+% In Quartus, detach the window from the main GUI window and
+% scale it to the desired size. Then ctrl-alt-printscr
+%
+% Screen-shot saved with Paint to PNG
+\begin{landscape}
+\begin{figure}[p]
+  \begin{center}
+    \includegraphics[width=210mm]
+    {figures/qsys_system_hierarchy.png}
+  \end{center}
+  \caption{Quartus II hierarchy display for the
+  {\tt qsys\_system} design. The design uses 1058 LCs, with
+  the bulk being used by the JTAG hub ({\tt sld\_hub}, 99 LCs)
+  and the JTAG-to-Avalon-MM master ({\tt jtag\_master}, 811 LCs).}
+  \label{fig:qsys_system_hierarchy}
+\end{figure}
+\end{landscape}
+
+% -----------------------------------------------------------------
+\subsection{Simulation}
+% -----------------------------------------------------------------
+
+The Qsys System design can be simulated using two possible methods;
+use the Avalon-MM master BFM documented in the Verification IP
+Guide, or live-on-the-edge and use the completely undocumented
+Verilog tasks hidden deep within the JTAG-to-Avalon-MM master 
+implementation. The following sections describe both methods.
+
+% -----------------------------------------------------------------
+\subsubsection{Qsys simulation configuration}
+% -----------------------------------------------------------------
+
+The Qsys {\em Generate} tab has several simulation options that
+are described in the Quartus II Handbook, Volume 1, Chapter 5,
+{\em Creating a System with Qsys} under {\em Simulating a Qsys
+System}, on page 5-14~\cite{Altera_Quartus_Handbook_2011}.
+This tutorial supplies the top-level testbench, so Qsys only
+needs to generate the simulation model for the Qsys
+system. The simulation model is created by setting the 
+{\em Create simulation model} pull-down to {\em Verilog},
+and then clicking the {\em Generate} button to generate
+the system. The simulation model files are output in the 
+project directory \verb+qsys_system/simulation+. 
+
+The Qsys simulation option creates directories containing copies
+of code from the Quartus installation, eg., the code in
+the synthesis directory \verb+qsys_system/synthesis/submodules+,
+is duplicated in the simulation directory
+\verb+qsys_system/simulation/submodules+ 
+(along with a few extra files copied from the Quartus 
+install). Appendix~\ref{app:altera_bugs} 
+Note 6\phantomsection\label{bug:6b} discusses the disadvantages of 
+copying what is essentially library source code into a project.
+
+% -----------------------------------------------------------------
+% msim_setup.tcl commands
+% -----------------------------------------------------------------
+\begin{figure}[t]
+\begin{center}
+\begin{minipage}{\textwidth}
+\begin{verbatim}
+#
+# List Of Command Line Aliases 
+# 
+# dev_com              -- Compile device library files 
+# 
+# com                  -- Compile the design files in correct order 
+# 
+# elab                 -- Elaborate top level design 
+# 
+# elab_debug           -- Elaborate the top level design with novopt option 
+# 
+# ld                   -- Compile all the design files and elaborate the top
+#                          level design 
+# 
+# ld_debug             -- Compile all the design files and elaborate the top
+#                        level design with -novopt 
+# 
+# List Of Variables 
+# 
+# TOP_LEVEL_NAME       -- Top level module name. 
+# 
+# SYSTEM_INSTANCE_NAME -- Instantiated system module name inside top level
+#                         module. 
+# 
+# QSYS_SIMDIR          -- Qsys base simulation directory. 
+#
+\end{verbatim}
+\end{minipage}
+\end{center}
+  \caption{Qsys system Modelsim setup script ({\tt msim\_setup.tcl}) Tcl commands.}
+  \label{fig:qsys_system_msim_setup}
+\end{figure}
+
+% -----------------------------------------------------------------
+\subsubsection{Avalon-MM Master BFM}
+% -----------------------------------------------------------------
+
+Simulation of the Qsys system in Modelsim is performed with
+the assistance of the generated simulation script
+\verb+qsys_system/simulation/mentor/msim_setup.tcl+.
+The tutorial supplied testbench \verb+qsys_system_bfm_master_tb.sv+
+can be simulated as follows;
+%
+\begin{itemize}
+\item Start Modelsim
+\item Change directory to the Mentor simulation directory
+%
+\begin{verbatim}
+ModelSim> set TUTORIAL c:/temp/altera_jtag_to_avalon_mm_tutorial
+ModelSim> cd $TUTORIAL/qsys/qsys_system/simulation/mentor
+\end{verbatim}
+%
+\item Source the simulation script
+%
+\begin{verbatim}
+ModelSim> source msim_setup.tcl
+\end{verbatim}
+%
+Figure~\ref{fig:qsys_system_msim_setup} shows the script output.
+%
+\item Compile the device library source (not required for Modelsim-ASE)
+%
+%
+\begin{verbatim}
+ModelSim> dev_com
+\end{verbatim}
+%
+\item Compile the Qsys source
+%
+\begin{verbatim}
+ModelSim> com
+\end{verbatim}
+%
+\item Compile the tutorial testbench
+%
+\begin{verbatim}
+ModelSim> vlog -sv $TUTORIAL/hdl/qsys_system/test/qsys_system_bfm_master_tb.sv
+         -L qsys_system_bfm_master
+\end{verbatim}
+%
+The library path option, \verb+-L+, is required so that the SystemVerilog
+verbosity package, compiled by the \verb+msim_setup.tcl+ script \verb+com+
+procedure, is located.
+%
+\item Set the testbench to the top-level entity 
+(\verb+TOP_LEVEL_NAME+ is used by the \verb+msim_setup.tcl+
+script \verb+elab+ procedure)
+%
+\begin{verbatim}
+ModelSim> set TOP_LEVEL_NAME qsys_system_bfm_master_tb
+\end{verbatim}
+%
+\item Elaborate the testbench
+%
+\begin{verbatim}
+ModelSim> elab +nowarnTFMPC
+\end{verbatim}
+%
+where the argument to the command gets passed to \verb+vsim+ to
+suppress warnings about missing connections.
+%
+\item Populate the wave window using
+%
+\begin{verbatim}
+VSIM> do $TUTORIAL/hdl/qsys_system/scripts/qsys_system_bfm_master_tb.do
+\end{verbatim}
+%
+\item Run the simulation
+%
+\begin{verbatim}
+VSIM> run -a
+\end{verbatim}
+%
+\end{itemize}
+%
+The testbench console output matches that generated by 
+SOPC Builder in Figure~\ref{fig:sopc_system_bfm_master_tb}.
+
+\clearpage
+% -----------------------------------------------------------------
+\subsubsection{JTAG-to-Avalon-MM Master}
+% -----------------------------------------------------------------
+
+The tutorial supplied testbench \verb+qsys_system_jtag_master_tb.sv+
+can be simulated as follows;
+%
+\begin{itemize}
+\item Start Modelsim
+\item Change directory to the Mentor simulation directory
+%
+\begin{verbatim}
+ModelSim> set TUTORIAL c:/temp/altera_jtag_to_avalon_mm_tutorial
+ModelSim> cd $TUTORIAL/qsys/qsys_system/simulation/mentor
+\end{verbatim}
+%
+\item Source the simulation script
+%
+\begin{verbatim}
+ModelSim> source msim_setup.tcl
+\end{verbatim}
+%
+Figure~\ref{fig:qsys_system_msim_setup} shows the script output.
+%
+\item Compile the device library source (not required for Modelsim-ASE)
+%
+%
+\begin{verbatim}
+ModelSim> dev_com
+\end{verbatim}
+%
+\item Compile the Qsys source
+%
+\begin{verbatim}
+ModelSim> com
+\end{verbatim}
+%
+\item Compile the tutorial testbench
+%
+\begin{verbatim}
+ModelSim> vlog -sv $TUTORIAL/hdl/qsys_system/test/qsys_system_jtag_master_tb.sv
+         -L qsys_system_bfm_master
+\end{verbatim}
+%
+The library path option, \verb+-L+, is required so that the SystemVerilog
+verbosity package, compiled by the \verb+msim_setup.tcl+ script \verb+com+
+procedure, is located.
+%
+\item Set the testbench to the top-level entity 
+(\verb+TOP_LEVEL_NAME+ is used by the \verb+msim_setup.tcl+
+script \verb+elab+ procedure)
+%
+\begin{verbatim}
+ModelSim> set TOP_LEVEL_NAME qsys_system_jtag_master_tb
+\end{verbatim}
+%
+\item Elaborate the testbench
+%
+\begin{verbatim}
+ModelSim> elab +nowarnTFMPC
+\end{verbatim}
+%
+where the argument to the command gets passed to \verb+vsim+ to
+suppress warnings about missing connections.
+%
+\item Populate the wave window using
+%
+\begin{verbatim}
+VSIM> do $TUTORIAL/hdl/qsys_system/scripts/qsys_system_jtag_master_tb.do
+\end{verbatim}
+%
+\item Run the simulation
+%
+\begin{verbatim}
+VSIM> run -a
+\end{verbatim}
+%
+\end{itemize}
+%
+The testbench console output matches that generated by 
+SOPC Builder in Figure~\ref{fig:sopc_system_bfm_master_tb}.
+
+Figure~\ref{fig:qsys_system_sld_node} shows the path to the 
+JTAG node within the JTAG-to-Avalon-MM bridge. The path to 
+this node was first determined by elaborating \verb+qsys_system+
+(rather than the testbench), and then using the Modelsim 
+hierarchy window to determine the path to the node.
+
+\clearpage
+% -----------------------------------------------------------------
+% JTAG-to-Avalon-MM bridge path to the SLD node
+% -----------------------------------------------------------------
+%
+% Compile the qsys_system_jtag_master_tb.sv file.
+%
+% Detach the Modelsim window, scale to the desired size, highlight
+% the JTAG node, capture the window using ctrl-alt-printsrc, and
+% paste into Paint. Save as PNG.
+%
+\begin{figure}[p]
+  \begin{center}
+    \includegraphics[width=0.88\textwidth]{figures/qsys_altera_jtag_sld_node_hierarchy.png}
+  \end{center}
+  \caption{Altera JTAG node location in the Qsys system
+  JTAG-to-Avalon-MM master testbench,
+  {\tt qsys\_system\_jtag\_master\_tb}. The tasks under the
+  highlighted JTAG {\tt node}, i.e., {\tt shift\_one\_byte} down
+  to {\tt clear\_states},
+  are used to simulate the JTAG-to-Avalon-MM bridge.}
+  \label{fig:qsys_system_sld_node}
+\end{figure}
+
+\clearpage
+% -----------------------------------------------------------------
+\subsection{Synthesis and Simulation Scripts}
+% -----------------------------------------------------------------
+
+The Qsys design can be synthesized as follows;
+%
+\begin{itemize}
+\item Start Quartus.
+\item Change to the Qsys BeMicro-SDK project and
+source the synthesis script
+%
+\begin{verbatim}
+tcl> set TUTORIAL c:/temp/altera_jtag_to_avalon_mm_tutorial
+tcl> cd $TUTORIAL/hdl/boards/bemicro_sdk/qsys_system
+tcl> source scripts/synth.tcl
+\end{verbatim}
+%
+\item The first time the script is run, it will copy the
+\verb+qsys_system.qsys+ file to a work directory, and request
+the user to manually run the Qsys GUI.
+
+The \verb+.qsys+ file does not preserve the settings on the 
+{\em Generate} tab, so uncheck {\em Create block symbol file}
+and select {\em Verilog} for {Create Simulation Model}.
+Click {\em Generate} to generate the system files.
+
+Source the synthesis script (use the up-arrow in the Quartus
+Tcl console to bring back the last command issued)
+%
+\begin{verbatim}
+tcl> source scripts/synth.tcl
+\end{verbatim}
+%
+\item Synthesis of the Qsys design should complete without error.
+
+The Quartus {\em Processing} window will generate warning messages
+(blue text). Warning messages relating to HDL coding style are
+generated for some of the Altera IP, eg., missing connections for
+the Avalon-MM BFM master (since it is for simulation only),
+signals that were assigned and never read, and truncated signals.
+Ideally, these warnings would be eliminated or suppressed by the
+Altera IP developers, either by correcting the code or using synthesis
+constraints.
+\end{itemize}
+
+The Qsys design can be simulated as follows;
+%
+\begin{itemize}
+\item Start Quartus and {\em Generate} the Qsys system
+(making sure the {\em Verilog} simulation option is checked).
+\item Start Modelsim.
+\item Change to the Qsys system directory and source the
+simulation script
+%
+\begin{verbatim}
+ModelSim> cd $TUTORIAL/hdl/qsys_system
+ModelSim> source scripts/sim.tcl
+\end{verbatim}
+%
+\item The simulation script uses the \verb+msim_setup.tcl+
+script to compile the Qsys source, and creates two Tcl procedures
+that can be used to run the simulation, i.e.,
+%
+\begin{verbatim}
+# JTAG-to-Avalon-MM tutorial testbench procedures 
+# ----------------------------------------------- 
+#  
+#   qsys_system_bfm_master_tb  - run the Avalon-MM BFM testbench 
+#   qsys_system_jtag_master_tb - run the JTAG-to-Avalon-MM testbench 
+\end{verbatim}
+%
+Issue either of these commands to run the respective simulation.
+
+\item The simulation script creates a working directory called
+\verb+mwork+, changes into that directory, sources and then calls
+procedures in the \verb+msim_setup.tcl+ script. 
+
+The \verb+msim_setup.tcl+ procedures copy files into the working
+directory and create Modelsim library mappings in a subdirectory
+called \verb+libraries+\phantomsection\label{bug:9}.
+The library mappings are created with
+{\em relative} path names, so the testbenches must be run from 
+within the \verb+mwork+ directory, otherwise Modelsim cannot locate
+the design components. 
+
+To re-run the simulation script, quit the simulation (since Modelsim
+will not allow you to change directories otherwise), change directory
+to the top-level directory and source the script again, i.e.,
+%
+\begin{verbatim}
+VSIM> quit -sim
+ModelSim> cd $TUTORIAL/hdl/qsys_system
+ModelSim> source scripts/sim.tcl
+\end{verbatim}
+%
+Alternatively, if you simply edited the top-level testbench, recompile
+it and restart the simulation via
+%
+\begin{verbatim}
+VSIM> vlog -sv ../test/qsys_system_bfm_master_tb.sv -L qsys_system_bfm_master
+VSIM> restart -f; run -a
+\end{verbatim}
+%
+\end{itemize}
+
+The tutorial source contains Qsys projects for Quartus synthesis on 
+the BeMicro-SDK, BeMicro, and DE2 boards. The Qsys Modelsim simulation
+script would ideally be board agnostic, however, it needs to use
+Quartus generated Qsys source. By default the Qsys Modelsim 
+simulation script checks for the existence of the BeMicro-SDK Quartus
+work directory (which is setup by the synthesis script). If you 
+synthesize the Qsys design for the BeMicro or DE2 board, and want
+to simulate that source, you need to edit the 
+the \verb+board+ variable in the \verb+sim.tcl+ script to
+reflect the path to the board you are targeting.
+However, since Quartus generates the same Qsys simulation files 
+regardless of the board type, just follow the synthesis procedure 
+above for the BeMicro-SDK board to create the files needed for 
+Qsys simulation (no editing of tutorial scripts required).
+
+\clearpage
+% =================================================================
+\section{Host-to-FPGA Communications}
+% =================================================================
+\label{sec:host_to_fpga_communications}
+
+The goal of this tutorial is to demonstrate communications between
+a client application and an Altera Avalon system such as that
+shown in Figure~\ref{fig:system_diagram}. Previous sections
+have shown how to construct the Altera Avalon hardware using
+both SOPC Builder and Qsys tools. This section shows how to 
+communicate with that hardware via the USB-Blaster interface
+and Altera-provided applications.
+
+% -----------------------------------------------------------------
+\subsection{System Console}
+% -----------------------------------------------------------------
+%
+The Quartus II Handbook, Volume 3, Chapter 10, {\em Analyzing and
+Debugging Designs with the System Console}, describes the 
+{\em System Console} interactive debugging console. 
+Table 10-3 on pages 10-7 and 10-8 lists the console 
+commands\cite{Altera_Quartus_Handbook_2011}.
+
+The BeMicro-SDK board was configured with the Altera Avalon
+system developed in this tutorial. 
+Figure~\ref{fig:system_console_interactive} shows 
+the System Console commands issued to interact with the 
+BeMicro-SDK (the session was repeated for both the SOPC and
+Qsys hardware configurations).
+
+The System Console procedures were used to create higher-level
+Tcl procedures for controlling the LEDs, reading the switches
+and push-button, and for accessing SRAM. The script is located
+in the BeMicro-SDK shared scripts directory,
+%
+\begin{verbatim}
+$TUTORIAL/hdl/boards/bemicro_sdk/share/scripts/jtag_cmds_sc.tcl
+\end{verbatim}
+%
+Similar scripts exist for the BeMicro and DE2 boards. Read the
+scripts for the slight differences in procedures (due to the
+slight difference in hardware available on these boards).
+Figure~\ref{fig:system_console_jtag_cmds_sc} shows an
+interactive System Console session with the BeMicro-SDK.
+Note how the device
+was never opened; the scripts use a Tcl global variable to track
+whether the JTAG interface is open, and if it is not, the procedures
+automatically open the JTAG interface. Read the script source
+for details.
+
+% -----------------------------------------------------------------
+\subsection{\tt quartus\_stp}
+% -----------------------------------------------------------------
+%
+The command-line tool \verb+quartus_stp+ can also be used for
+JTAG access. Unfortunately, Altera does not provide Tcl procedures
+for accessing the JTAG-to-Avalon-MM master component from within
+\verb+quartus_stp+. The functionality of the JTAG-to-Avalon-MM 
+master communications was reverse-engineered from the source 
+code and SignalTap II logic analyzer traces 
+in~\cite{Hawkins_Altera_JTAG_to_Avalon_Analysis_2012}, and
+from that analysis a set of Tcl procedures was developed.
+The tutorial source contains the procedures in the directory 
+%
+\begin{verbatim}
+$TUTORIAL/tcl/altera_jtag_to_avalon_stp
+\end{verbatim}
+%
+The procedures are written as a Tcl package.
+Use of the package requires the user to either; configure the
+environment variable \verb+TCLLIBPATH+ to point to the 
+package directory, or the package directory can be copied into 
+the Altera Tcl packages directory, eg.,
+%
+\begin{verbatim}
+c:/software/altera/11.1sp1/quartus/common/tcl/packages
+\end{verbatim}
+%
+Figure~\ref{fig:quartus_stp_interactive} shows an
+interactive \verb+quartus_stp+ session with the BeMicro-SDK.
+The session starts by loading the JTAG-to-Avalon-MM master
+package, and then importing the Tcl procedure names
+(saving you typing the namespace of the package as a prefix
+to every command). For details on Tcl packages and
+namespaces see~\cite{Welch_2000}.
+
+% -----------------------------------------------------------------
+% System Console Tcl session
+% -----------------------------------------------------------------
+%
+% To get the text formatted in color, a minipage is used along with
+% the color package. The font is changed to typewriter style, and
+% the info text is changed to blue or green to match the appearance
+% in system console.
+%
+\begin{figure}[p]
+\hfil
+\framebox{
+\hspace{1mm}
+\begin{minipage}{140mm}
+\vspace{4mm}
+\tt
+\# Get the list of master services\\
+\% \textcolor{blue}{set} masters [\textcolor{blue}{get\_service\_paths} master]\\
+\{/devices/EP3C25|EP4CE22@1\#USB-0/(link)/JTAG/(110:132 v1 \#0)/phy\_0/master\}\\
+\\
+\# Select the first master\\
+\% \textcolor{blue}{set} master [\textcolor{blue}{lindex} \textcolor{green}{\$masters} 0]\\
+\\
+\# Open the master service\\
+\% \textcolor{blue}{open\_service} master \textcolor{green}{\$master}\\
+\\
+\# Write to the LEDs\\
+\% \textcolor{blue}{master\_write\_32} \textcolor{green}{\$master} 0 0x55\\
+\\
+\# Read the push-button and switches SW[2:1]\\
+\% \textcolor{blue}{master\_read\_32}  \textcolor{green}{\$master} 0x10 1\\
+0x00000000\\
+\\
+\# Change SW[1] and re-read\\
+\% \textcolor{blue}{master\_read\_32} \textcolor{green}{\$master} 0x10 1\\
+0x00000001\\
+\\
+\# Change SW[2] and re-read\\
+\% \textcolor{blue}{master\_read\_32} \textcolor{green}{\$master} 0x10 1\\
+0x00000003\\
+\\
+\# Hold down the push-button and re-read\\
+\% \textcolor{blue}{master\_read\_32} \textcolor{green}{\$master} 0x10 1\\
+0x00000007\\
+\\
+\# Write four 32-bit locations in SRAM\\
+\% \textcolor{blue}{master\_write\_32} \textcolor{green}{\$master} 0x1000 [\textcolor{blue}{list} 0x33221100 0x77665544 0xbbaa9988 0xffeeddcc]\\
+\\
+\# Read four 32-bit locations from SRAM\\
+\% \textcolor{blue}{master\_read\_32}  \textcolor{green}{\$master} 0x1000 4\\
+0x33221100 0x77665544 0xbbaa9988 0xffeeddcc\\
+\\
+\# Read sixteen 8-bit locations from SRAM\\
+\% \textcolor{blue}{master\_read\_memory}  \textcolor{green}{\$master} 0x1000 16\\
+0x00 0x11 0x22 0x33 0x44 0x55 0x66 0x77 0x88 0x99 0xaa 0xbb 0xcc 0xdd 0xee 0xff\\
+\\
+\# Close the master service\\
+\% \textcolor{blue}{close\_service} master \textcolor{green}{\$master}\\
+\vspace{1mm}
+\end{minipage}
+}\hfil
+\caption{System Console interactive session controlling the 
+BeMicro-SDK board configured with the Altera Avalon system
+shown in Figure~\ref{fig:system_diagram}. The lines starting 
+with {\tt \#} are comments and were not entered at the console.}
+\label{fig:system_console_interactive}
+\end{figure}
+
+% -----------------------------------------------------------------
+% System Console jtag_cmds_sc.tcl
+% -----------------------------------------------------------------
+%
+\begin{figure}[p]
+\hfil
+\framebox{
+\hspace{1mm}
+\begin{minipage}{140mm}
+\vspace{4mm}
+\tt
+\# Source the System Console JTAG Tcl procedures\\
+\% set TUTORIAL c:/temp/altera\_jtag\_to\_avalon\_mm\_tutorial\\
+\% source \$TUTORIAL/hdl/boards/bemicro\_sdk/share/scripts/jtag\_cmds\_sc.tcl\\
+\\
+\# Write/read the LEDs\\
+\% led\_write 0x23\\
+\% led\_read\\
+0x23\\
+\\
+\# Read the switches\\
+\% sw\\
+2\\
+\\
+\# Read the push-button (not pressed)\\
+\% pb\\
+0\\
+\\
+\# Read the push-button (pressed)\\
+\% pb\\
+1\\
+\\
+\# Write/read the SRAM\\
+\% sram\_write 0 0x12345678\\
+\% sram\_read 0\\
+0x12345678\\
+\vspace{1mm}
+\end{minipage}
+}\hfil
+\caption{System Console interactive session controlling the 
+BeMicro-SDK board using the Tcl procedures implemented
+in {\tt jtag\_cmds\_sc.tcl}. The lines starting 
+with {\tt \#} are comments and were not entered at the console.}
+\label{fig:system_console_jtag_cmds_sc}
+\end{figure}
+
+% -----------------------------------------------------------------
+% quartus_stp interactive
+% -----------------------------------------------------------------
+%
+\begin{figure}[p]
+\hfil
+\framebox{
+\hspace{1mm}
+\begin{minipage}{140mm}
+\vspace{4mm}
+\tt
+\# Print TCLLIBPATH (needed to load the JTAG-to-Avalon-MM Tcl package)\\
+tcl> puts \$env(TCLLIBPATH)\\
+c:/temp/altera\_jtag\_to\_avalon\_mm\_tutorial/tcl/altera\_jtag\_to\_avalon\_stp\\
+\\
+\# Load the JTAG-to-Avalon-MM Tcl package and import the package commands
+tcl> package require altera\_jtag\_to\_avalon\_stp\\
+1.0\\
+tcl> namespace import altera\_jtag\_to\_avalon\_stp::*\\
+\\
+\# Print the list of JTAG commands (commands prefixed with jtag)\\
+tcl> info commands jtag*\\
+jtag\_idcode jtag\_pulse\_nconfig jtag\_read jtag\_node\_id jtag\_node\_is\_bytestream jtag\_open jtag\_resetrequest jtag\_write jtag\_node\_is\_master jtag\_send jtag\_print\_hub\_info jtag\_close jtag\_usercode jtag\_print\_node\_info jtag\_number\_of\_nodes\\
+\\
+\# Open the JTAG interface\\
+tcl> jtag\_open\\
+JTAG: USB-Blaster [USB-0], FPGA: @1: EP3C25/EP4CE22 (0x020F30DD)\\
+\\
+\# Print the JTAG hub info\\
+tcl> jtag\_print\_hub\_info\\
+         Hub info: 0x8086E04\\
+      VIR m-width: 4\\
+      VIR n-width: 1\\
+  Manufacturer ID: 0x6E\\
+  Number of nodes: 1\\
+       IP Version: 1\\
+\\
+\# Print the JTAG node info\\
+tcl> jtag\_print\_node\_info\\
+       Node index:    0\\
+    Node instance:    0 (0x0)\\
+Node manufacturer:  110 (0x6E)\\
+          Node ID:  132 (0x84)\\
+     Node purpose:    1 (0x1)\\
+     Node version:    1 (0x1)\\
+\\
+\# Write/read the LEDs (the first argument is the JTAG node index)\\
+\% jtag\_write 0 0 0x23\\
+\% jtag\_read 0 0\\
+0x23\\
+\\
+\# Write/read the SRAM\\
+\% jtag\_write 0 0x1000 0x12345678\\
+\% jtag\_read 0 0x1000\\
+0x12345678\\
+\vspace{1mm}
+\end{minipage}
+}\hfil
+\caption{{\tt quartus\_stp} interactive session controlling the 
+BeMicro-SDK board.}
+\label{fig:quartus_stp_interactive}
+\end{figure}
+
+\clearpage
+% -----------------------------------------------------------------
+% quartus_stp client
+% -----------------------------------------------------------------
+%
+% Screen-shot saved with Paint to PNG
+\begin{figure}[t]
+  \begin{center}
+    \includegraphics[width=0.6\textwidth]{figures/jtag_client_gui.png}
+  \end{center}
+  \caption{{\tt quartus\_stp} JTAG client Tcl/Tk GUI.}
+  \label{fig:quartus_stp_jtag_client}
+\end{figure}
+
+% -----------------------------------------------------------------
+\subsection{Client/Server}
+% -----------------------------------------------------------------
+%
+Altera does not provide a shared library or DLL for accessing
+the JTAG interface from custom code, so how then do you write 
+code in your favorite programming language, eg., C/C++, MATLAB,
+or LabView?
+One solution is to use System Console or \verb+quartus_stp+
+to implement a TCP/IP server that provides hardware access, 
+and implement your custom code as a TCP/IP client application.
+The tutorial source contains Tcl-based server and client
+applications in the directory
+%
+\begin{verbatim}
+$TUTORIAL/tcl/jtag_client_server
+\end{verbatim}
+%
+Figure~\ref{fig:quartus_stp_jtag_client} shows a Tcl/Tk based
+client graphical user interface (GUI). The client can issue
+read and write requests to the server, and the server then
+performs those accesses on the hardware. The figure shows
+the result of reading the first address in SRAM (which was
+previously written with the value 0x12345678).
+
+Figure~\ref{fig:quartus_stp_jtag_server} shows the Tcl/Tk based
+server console output for \verb+quartus_stp+. Note the comment
+{\tt Handle the client via a fileevent callback}. The Tcl
+\verb+fileevent+ command is critical to the implementation
+of a Tcl TCP/IP server~\cite{Welch_2000}.
+Versions of System Console earlier than Quartus II version 11.1sp1
+did not support the Tcl \verb+fileevent+ procedure, so they could
+not implement a proper server, i.e., a server able to handle
+multiple clients. Figure~\ref{fig:system_console_jtag_server}
+shows the server output for System Console
+(Quartus II version 11.1sp1).
+
+The server application has a debug mode. If the server is started
+via
+%
+\begin{verbatim}
+% set debug 1
+% source jtag_server.tcl
+\end{verbatim}
+%
+then the server starts in a debug mode where hardware accesses
+are not performed, and client read/write accesses are
+performed on a server variable, eg., the client can write
+to an address and then read it back. The server debug mode
+allows you to test the client/server interface without having
+access to hardware. It also allows the client/server TCP/IP 
+communications path to be tested without hardware interaction.
+
+To test the multiple client handling of the server (in either
+hardware or debug mode), use the client to write the hexadecimal values
+(address,data) =  (1000, 11111111), (1004, 22222222), (1008, 33333333),
+and (100C, 44444444). Click on the client disconnect button,
+then reconnect and read from the four hexadecimal addresses
+1000, 1004, 1008, 100C. Start multiple \verb+quartus_stp+ clients, or
+start the client in another Tcl/Tk tool, eg., the 
+\href{http://www.activestate.com/activetcl}
+{ActiveState ActiveTcl} Tcl/Tk shell \verb+wish84+, and use the
+multiple clients to write and read to different server addresses. 
+
+The client/server source also contains a command-line C language
+client, \verb+jtag_client.c+. The client can be built at the
+NIOS IDE shell using
+%
+\begin{verbatim}
+bash-3.1$ gcc -Wall -o jtag_client jtag_client.c
+\end{verbatim}
+%
+The client can write to multiple SRAM locations using
+%
+\begin{verbatim}
+./jtag_client -w 0x1000 -d 0x11111111
+./jtag_client -w 0x1004 -d 0x22222222
+./jtag_client -w 0x1008 -d 0x33333333
+./jtag_client -w 0x100C -d 0x44444444
+\end{verbatim}
+%
+and read back using
+%
+\begin{verbatim}
+./jtag_client -r 0x1000
+./jtag_client -r 0x1004
+./jtag_client -r 0x1008
+./jtag_client -r 0x100C
+\end{verbatim}
+%
+The NIOS IDE shell generates output showing the address and data.
+The server console shows how the client opens and closes a
+socket connection each time the client application runs.
+
+The client/server example performs TCP/IP communications using
+ASCII strings, and the server performs hardware access using
+32-bit read/write commands. The performance bottleneck with
+this approach is not the use of ASCII over TCP/IP, but the
+server hardware access. When performing accesses to large
+numbers of bytes, the JTAG 32-bit read/write commands
+do not make the most efficient use of the underlying
+JTAG bytestreams. If your custom server needs a hardware
+access performance boost, then use the System Console 
+\verb+master_read_memory+ and \verb+master_write_memory+ commands.
+The JTAG bytestream performance is analyzed 
+in~\cite{Hawkins_Altera_JTAG_to_Avalon_Analysis_2012}.
+For simple hardware accesses, eg., updating LEDs, reading
+switches and push buttons, and accessing sensors, the
+32-bit read/write routines used in the client/server example
+are more than sufficient.
+
+% -----------------------------------------------------------------
+% quartus_stp server
+% -----------------------------------------------------------------
+%
+\begin{figure}
+\hfil
+\framebox{
+\hspace{1mm}
+\begin{minipage}{140mm}
+\vspace{4mm}
+\tt
+tcl> source jtag\_server.tcl
+\\
+JTAG server running under quartus\_stp\\
+\\
+Open JTAG to access the JTAG-to-Avalon-MM master\\
+JTAG: USB-Blaster [USB-0], FPGA: @1: EP3C25/EP4CE22 (0x020F30DD)\\
+\\
+Start the server on port 2540\\
+\\
+Wait for clients\\
+\\
+Accept sock1284 from 127.0.0.1 port 1427\\
+Handle the client via a fileevent callback\\
+SERVER (sock1284): jtag\_read 0x00000000\\
+SERVER: jtag\_read 0x00000000\\
+SERVER (sock1284): 0x00000045\\
+SERVER (sock1284): jtag\_read 0x00001000\\
+SERVER: jtag\_read 0x00001000\\
+SERVER (sock1284): 0x12345678\\
+\vspace{1mm}
+\end{minipage}
+}\hfil
+\caption{{\tt quartus\_stp} JTAG server console output.}
+\label{fig:quartus_stp_jtag_server}
+%\end{figure}
+%
+% -----------------------------------------------------------------
+% System Console (Quartus 11.1sp1) server
+% -----------------------------------------------------------------
+%
+\vskip10mm
+%\begin{figure}
+\hfil
+\framebox{
+\hspace{1mm}
+\begin{minipage}{140mm}
+\vspace{4mm}
+\tt
+\% \textcolor{blue}{source} jtag\_server.tcl
+\\
+JTAG server running under system console\\
+\\
+This version of SystemConsole (11.1sp1 216) supports fileevent.\\
+The server can support multiple clients.\\
+\\
+Open JTAG to access the JTAG-to-Avalon-MM master\\
+\\
+Start the server on port 2540\\
+\\
+Wait for clients\\
+\\
+Accept sock2024 from 127.0.0.1 port 1466\\
+Handle the client via a fileevent callback\\
+SERVER (sock2024): jtag\_read 0x00000000\\
+SERVER: jtag\_read 0x00000000\\
+SERVER (sock2024): 0x00000045\\
+SERVER (sock2024): jtag\_read 0x00001000\\
+SERVER: jtag\_read 0x00001000\\
+SERVER (sock2024): 0x12345678\\
+\vspace{1mm}
+\end{minipage}
+}\hfil
+\caption{System Console JTAG server console output.}
+\label{fig:system_console_jtag_server}
+\end{figure}
+
+\clearpage
+\appendix
+% =================================================================
+\section{Software Versions}
+% =================================================================
+\label{sec:software_versions}
+
+% -----------------------------------------------------------------
+\subsection*{Current version of Quartus}
+% -----------------------------------------------------------------
+
+This tutorial was tested using the following Quartus II 11.1sp1
+editions, and operating systems;
+%
+\begin{itemize}
+\item The tutorial was written to be implemented using Quartus II 11.1sp1.
+%
+\item The tutorial was developed using Quartus II 11.1sp1
+(full edition) under Windows XP Professional 32-bit. 
+The synthesis scripts for all boards and both SOPC and Qsys systems
+were fully tested. 
+The simulation script was tested targeting the hardware generated
+for the BeMicro-SDK. Each board was configured with the SOPC or
+Qsys designs, and system console was used to interactively check 
+each design.
+%
+\item Linux Centos 6.2 32-bit running Quartus II 11.1sp1 full-edition;
+tested the synthesis scripts, the simulation script with the
+BeMicro-SDK generated files, and hardware tested using system console.
+%
+%
+\item Windows 7 Professional 64-bit running Quartus II 11.1sp1 full-edition
+(32-bit and 64-bit);
+tested the BeMicro-SDK synthesis and simulation scripts,
+and hardware tested using system console.
+%
+\item Windows 7 Professional 64-bit running Modelsim SE 10.0c 64-bit;
+tested the simulation scripts with the BeMicro-SDK generated files.
+
+The Qsys BFM testbench fails to load due to the DLL
+\verb+bytestream_pli.dll+ being incompatible with 64-bit Modelsim.
+This DLL is not used by the testbench, so the BeMicro-SDK Qsys
+project \verb+msim_setup.tcl+ script \verb+elab+ procedure was 
+edited to remove the \verb+vsim+ PLI argument. 
+The Qsys BFM testbench then loads and runs correctly.
+%
+\item Quartus II v11.1sp1 Web Edition for;
+\begin{itemize}
+\item Windows XP (32-bit)
+\item Linux Centos 6.2 (32-bit)
+\item Linux Ubuntu 11.10 (32-bit)
+\end{itemize}
+%
+Each installation was used to test the BeMicro-SDK synthesis and 
+simulation scripts, and hardware tested using system console.
+
+Each Web Edition installation was tested running in a VirtualBox 
+(version 4.1.8) virtual machine (VM). The VMs were tested 
+from hosts running Windows XP, Centos 6.2, and Windows 7.
+The USB-Blaster can be captured by the VM under Windows XP
+and Centos 6.2, but not under Windows 7 (so the issue is
+likely with the host VM support, rather than with the client).
+
+The tutorial scripts use the environment variable \verb+QUARTUS_ROOTDIR+.
+This variable is created automatically by Quartus II under 
+Windows, but under Linux it needs to be defined by the user.
+For example, under Linux, after installing Quartus II Web Edition
+and Modelsim-ASE into the directory
+\verb+/opt/altera/11.sp1_free+, the user \verb+.bashrc+ 
+should be edited to add
+%
+\begin{verbatim}
+export QUARTUS_ROOTDIR=/opt/altera/11.sp1_free/quartus
+export PATH=$PATH:$QUARTUS_ROOTDIR/bin
+export PATH=$PATH:/opt/altera/11.sp1_free/modelsim_ase/linuxaloem
+\end{verbatim}
+%
+The commands \verb+quartus+ and \verb+vsim+ can then be used
+from the bash shell.
+
+\end{itemize}
+
+\clearpage
+% -----------------------------------------------------------------
+\subsection*{Older versions of Quartus}
+% -----------------------------------------------------------------
+
+\begin{itemize}
+\item {\bf SOPC Builder}
+
+The SOPC Builder GUI and generated components have changed slightly between
+Quartus version 10.1 and 11.1sp1. The slight differences in SOPC Builder
+GUI paths to components is noted in the tutorial. The source
+generated by SOPC Builder has changed with Quartus 11.1sp1,
+eg., the JTAG-to-Avalon-MM bridge is now described solely by
+a \verb+_hw.tcl+ file, with the component being dynamically
+created by SOPC Builder. Previous versions of Quartus had an
+explicit JTAG master component (which looked like it was SOPC
+Builder generated source that was copied to the Quartus IP directory).
+
+\item {\bf Qsys}
+
+The Qsys GUI, generated scripts, and source have changed significantly
+since 10.1, where Qsys was in beta format. No attempt was made to try
+and support earlier versions of Qsys (it looked too painful).
+\end{itemize}
+
+% =================================================================
+\section{Tutorial Source}
+% =================================================================
+\label{app:tutorial_source}
+
+The tutorial zip file, 
+\verb+altera_jtag_to_avalon_mm_tutorial.zip+, unzips to create
+the directory layout shown in Table~\ref{tab:directory_layout}.
+There are slight differences in how zip extraction tools work
+under Windows and the bash shell (Cygwin or Linux).
+To unzip the tutorial zip file into a directory named
+\verb+altera_jtag_to_avalon_mm_tutorial+, perform the following;
+%
+\begin{itemize}
+\item {\bf Windows extraction}
+
+   Under Windows Explorer, select the zip file, and then
+   right click and select {\em Extract all $\dots$}
+  
+\item {\bf Bash command line extraction}
+
+Unzip using
+%
+\begin{verbatim}
+unzip -d altera_jtag_to_avalon_mm_tutorial altera_jtag_to_avalon_mm_tutorial.zip
+\end{verbatim}
+%
+If the \verb+-d+ option is not used, then the zip file creates
+the directories \verb+doc+, \verb+hdl+, and \verb+tcl+ in the
+current directory. Alternatively, you can first create
+the directory and then unzip, eg.,
+%
+\begin{verbatim}
+mkdir altera_jtag_to_avalon_mm_tutorial
+cp altera_jtag_to_avalon_mm_tutorial.zip altera_jtag_to_avalon_mm_tutorial/
+cd altera_jtag_to_avalon_mm_tutorial/
+unzip altera_jtag_to_avalon_mm_tutorial.zip
+\end{verbatim}
+%
+Using the \verb+-d+ option is recommended (as it involves less typing).
+ 
+The contents of the zip file can be listed using
+%
+\begin{verbatim}
+unzip -l altera_jtag_to_avalon_mm_tutorial.zip
+\end{verbatim}
+%
+\end{itemize}
+
+\clearpage
+% =================================================================
+\section{Altera Tool Improvement Recommendations}
+% =================================================================
+\label{app:altera_bugs}
+
+During the development of the tutorial, problems experienced with
+the user interface, the tool IP, or the tool design philosophy
+were cross-referenced to this appendix. The text references the
+following note numbers;
+%
+\begin{enumerate}
+%
+\item Page~\pageref{bug:1}: Why does SOPC Builder forget the SOPC System name?
+
+When the {\em Generate} button is pressed to generate the SOPC System,
+a pop-up dialog asks if the \verb+unnamed+ system should be saved.
+The system was however named when the SOPC Builder GUI was started,
+so this dialog should not be necessary.
+
+\item Page~\pageref{bug:2}: Synthesis issues with the Avalon-MM Master BFM.
+
+The Avalon-MM Master BFM component is intended for {\em simulation}-only.
+However, it can be incorporated into a system that is both simulated and
+synthesized. The source code for the component should include synthesis
+directives that disable the component during synthesis (by tying signals
+to deasserted levels), so that the synthesis tool can eliminate the
+logic without generated warnings about missing drivers and dangling pins.
+
+\item Page~\pageref{bug:3}: SOPC Builder {\em Run Simulator} Button.
+
+The button should not be activated until the \verb+.mpf+ file has been
+generated.
+
+\item Page~\pageref{bug:4}: Missing source files for Avalon-MM Master BFM simulation.
+
+The \verb+sopc_system.v+ verilog file does not include the packages required
+to simulate the Avalon-MM Master BFM.
+
+\item Page~\pageref{bug:5}: 
+Using Verilog \verb+include+ statements to resolve
+source dependencies.
+
+In the SOPC Builder example, 
+%
+\begin{itemize}
+\item In the \verb+sopc_system.v+ Verilog source, above the
+\verb+test_bench+ component, Verilog \verb+include+ statements have
+been used to include a mixture of code from the Quartus install directory,
+code copied to the project directory, and generated code
+(the list of includes changes depending on whether the {\em Simulation}
+check-box is checked or not).
+
+This support or library code should really be included into the project
+using the scripting features of the tool, eg., using Quartus or Modelsim
+Tcl commands, it should not use a Verilog-specific language feature
+embedded within a generated source file. 
+
+For more proof for this argument, consider that VHDL does not even
+support this type of include construct.
+%
+\item
+Because the SOPC System file \verb+sopc_system.v+ includes library
+source directly, this source is compiled {\em every} time the SOPC
+System is changed. This unnecessarily compiles source that has not
+changed. Under Modelsim, the only source that would need to be
+recompiled would be the interconnect and any new components added
+to the system.
+%
+\item
+The use of absolute paths in the \verb+include+ statements means that 
+this code is not portable between machines, so the code should not be
+checked into a code versioning system. Admittedly, this is generated 
+code, so the use of the absolute paths could be tolerated.
+%
+\item The Verilog \verb+include+ statements are not used
+consistently. In SOPC Builder, if you {\em do not} check the
+{\em Simulation} checkbox, then the JTAG master components are not
+listed in the \verb+include+ statements, whereas, if you do check
+the check box, the components are listed. The JTAG master is a
+{\em synthesizable} component, it should always be included!
+If there are differences between synthesis and simulation,
+then those differences should be hidden in the source code using
+synthesis directives (which both Verilog and VHDL support).
+
+In this particular example, the {\em synthesis} tool is provided the
+path to the JTAG component in the \verb+sopc_builder.qip+ file.
+This is a better solution, however, it is not reuseable by 
+Modelsim.
+
+\item Verilog and VHDL source files can be described via two
+strings; the source file name and the library in which that
+source should be compiled. The HDL source often has a compilation
+order requirement, eg., VHDL packages need to be compiled before
+use, and Verilog modules need to be compiled before they are
+instantiated in other modules.
+
+A general-purpose approach to including source would be for
+SOPC Builder to generate a list of source files per library, or
+a list of source file and library name pairs, with the list
+in the appropriate compilation order. Tcl synthesis and
+simulation scripts can then parse that list and issue the
+appropriate Quartus or Modelsim commands to include that
+source for compilation. This would allow source to be
+included into projects using {\em scripting} features, not HDL
+language features.
+%
+\end{itemize}
+
+\item Pages~\pageref{bug:6a} and~\pageref{bug:6b}: The copying of library component source to
+multiple project directories complicates verification.
+
+The Modelsim simulator can be used to compile Verilog and VHDL source code
+into libraries. The intention for those libraries is that they contain
+the components that are reusable across multiple projects. For example,
+Modelsim-ASE ships with the Altera LPM \verb+lpm+ and Megafunction 
+\verb+altera_mf+ components pre-compiled for Verilog and VHDL in the 
+directory \verb+c:/software/altera/11.1sp1/modelsim_ase/altera/+.
+%
+However, this is not how Quartus 11.1sp1 operates for SOPC Builder
+library components. For example, in the SOPC Builder example
+on page~\pageref{bug:6a},
+%
+\begin{itemize}
+%
+\item For synthesis, the JTAG-to-Avalon-MM master source code is 
+copied from the Quartus II installation into the directory 
+\verb+jtag_master+.
+%
+\item For simulation, the JTAG-to-Avalon-MM master source code is 
+copied from the Quartus II installation into the directory 
+\verb+jtag_master_sim+, and the \verb+sopc_system.v+ Verilog source,
+\verb+test_bench+ \verb+include+ statements refer to this new 
+directory, eg., \newline\verb+`include "jtag_master_sim/jtag_master.v"+.
+
+In addition, the directory \verb+jtag_master_sim+, also contains
+a {\em copy} of the \verb+jtag_master.v+ component instance
+from the project directory (which is just one directory above
+the copy). 
+%
+\end{itemize}
+%
+Why do all these copies complicate things? Well, if you are
+verifying all of your designs using Modelsim, then you should
+use Modelsim to build the library components into libraries,
+and then reuse those libraries while verifying all of the
+{\em project-specific} generated components. If there was
+a valid argument for copying library components to the project
+directory, then there should only be a {\em single} copy,
+the same copy could be used for both synthesis and simulation,
+and Modelsim could be used to create a project specific
+SOPC builder component library. However, SOPC Builder copies
+the library components a per-{\em component instance} basis.
+For example, if you add another JTAG-to-Avalon-MM bridge 
+component called \verb+jtag_master_two+, and regenerate the 
+system with  {\em Simulation} checked, then two new directories
+are created with additional copies of the library component source.
+
+Quartus 10.1 would generate Verilog \verb+include+ statements
+that referred to the original source files in the Quartus II
+installation (the SOPC Builder IP directory). This method
+at least points to the installed source area, but still uses
+a Verilog-specific language feature to include source, whereas
+scripting features should be used, as commented above.
+
+The Qsys example on page~\pageref{bug:6a} also copies code,
+but with a few differences relative to SOPC Builder;
+%
+\begin{itemize}
+\item Qsys creates a copy of library source code in synthesis
+and simulation directories;
+%
+\begin{verbatim}
+qsys_system/synthesis/submodules
+qsys_system/simulation/submodules
+\end{verbatim}
+%
+\item The top-level \verb+qsys_system+ file no longer contains
+Verilog \verb+include+ statements, the source files are instead
+included in a tool-specific manner; Quartus is provided the
+source information in the Tcl script
+%
+\begin{verbatim}
+qsys_system/synthesis/qsys_system.qip
+\end{verbatim}
+%
+while Modelsim is provided the files via the Tcl script
+%
+\begin{verbatim}
+qsys_system\simulation\mentor\msim_setup.tcl
+\end{verbatim}
+%
+The Modelsim Tcl script hard-codes the library mappings into
+the relative directory \verb+./libraries+ making this script
+difficult to support in a verification system that uses
+multiple versions of Modelsim, eg., Modelsim-ASE and
+Modelsim-SE (the binary library files produced by different
+versions of Modelsim are not compatible). Page~\pageref{bug:9}
+has comments on difficulties experienced with scripting
+the Qsys design.
+
+My preference would be to see these separate methods combined
+into a parseable Tcl list containing the source file name and
+the target library name. This would ease the writing of
+custom synthesis and simulation scripts.
+
+\end{itemize}
+
+\item Page~\pageref{bug:7}: The Qsys system file does not contain all of the system settings.
+
+The Qsys file \verb+.qsys+ does not preserve the state of the generate
+tab checkboxes. The state of the checkboxes and the simulation pull-down
+menus is stored in a preferences file. For example, in the Qsys 
+example on page~\pageref{bug:7}, the Qsys {\em Generation} tab
+options are stored in the XML file
+\verb+.qsys_edit/preferences.xml+ in an XML entry called \verb+generation+,
+containing key-value pairs for each of the GUI settings, eg.,
+in the Qsys generation tab
+%
+\begin{itemize}
+\item If the {\em Create block symbol file} checkbox is unchecked, that
+selection is stored in the preferences file as 
+\verb+<generation block_symbol_file="0"/>+. 
+%
+\item If the {\em Create simulation model} pull-down menu selects {\em Verilog},
+that selection adds the key-value pair \verb+simulation="VERILOG"+
+to the existing \verb+generation+ entry.
+%
+\end{itemize}
+%
+The use of an {\em additional} file to store the GUI settings
+complicates the re-generation of a Qsys system with simulation 
+support (from a minimal set of files), as now both the 
+\verb+.qsys+ and preferences files are required. Without
+the preferences files, the simulation files will {\em not} 
+get generated.
+
+This is a change from SOPC Builder, where the system (including
+simulation settings) could be regenerated using only 
+the \verb+.sopc+ file.
+
+\item Page~\pageref{bug:8}: Port names exported from Qsys are {\em not} what
+the user entered.
+
+\end{enumerate}
+
+
+\clearpage
+% =================================================================
+\section{Altera Documentation Web Links}
+% =================================================================
+
+\begin{itemize}
+%
+\item \href{http://www.altera.com/support/software/sof-quartus.html}
+{Quartus II Software Support}
+%
+\item \href{http://www.altera.com/literature/lit-qts.jsp}
+{Quartus II Development Software Documentation}
+%
+\item \href{http://www.altera.com/support/software/system/qsys/sof-qsys-index.html}
+{Qsys System Integration Tool Support}
+%
+\item \href{http://www.altera.com/literature/lit-sop.jsp}{SOPC Builder Documentation}
+%
+\item \href{http://www.altera.com/support/software/system/sopc/sof-sopc_builder.html}{SOPC Builder Support}
+%
+\item \href{http://www.altera.com/literature/lit-nio2.jsp}
+{NIOS II Processor Documentation}
+%
+\item \href{http://www.altera.com/support/ip/processors/nios2/ips-nios2_support.html}
+{Nios II Embedded Design Suite Support}
+%
+\end{itemize}
+
+%\clearpage
+% -----------------------------------------------------------------
+% Do the bibliography
+% -----------------------------------------------------------------
+%Note, you can't have spaces in the list of bibliography files
+%
+\bibliography{refs}
+\bibliographystyle{plain}
+
+% -----------------------------------------------------------------
+\end{document}
+
+
+
+
+
+
+
+
+
+
+
