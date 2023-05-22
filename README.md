@@ -170,9 +170,9 @@ Synthesizing the BeMicro-SDK 'qsys_system' design
 
 Timing Analyzer reported the same unconstrained paths as for the 14.1 build.
 
-# Simulation Tests
+# Modelsim and Questasim Simulation Tests
 
-## Modelsim and Questasim Avalon-MM BFM Simulation
+## Avalon-MM BFM Simulation
 
 The Qsys system simulation script (hdl/qsys_system/scripts/sim.tcl) needs several minor edits to operate in newer versions of the simulator. Run the sim.tcl script in the simulator first, and it will be obvious which of the following edits are needed.
 
@@ -213,7 +213,7 @@ Of the Quartus Modelsim and Questasim free editions tested, the following edits 
  - v22.1 required 1+2+3
 
 
-## Modelsim and Questasim JTAG Simulation
+## JTAG Simulation
 
 The testbench hdl/qsys_system/test/qsys_system_jtag_master_tb.sv uses the JTAG node buried within the JTAG-to-Avalon-MM bridge to exercise the JTAG TAP (read the header comments to understand how VTAP is defined). In the newer versions of Quartus tested, the generated JTAG-to-Avalon-MM master code no longer contains the 'node' instance representing the TAP controller. The generated code now contains JTAG SLD Virtual JTAG ports that are connected through the design hierarchy until the JTAG component instance within the top-level jtag_master, where the JTAG TAP ports are tied off to zeros. The new Intel JTAG-to-Avalon-MM version of this tutorial will update the testbench to control the JTAG TAP ports.
 
