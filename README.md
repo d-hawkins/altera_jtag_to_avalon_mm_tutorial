@@ -169,3 +169,49 @@ Synthesizing the BeMicro-SDK 'qsys_system' design
 ~~~
 
 Timing Analyzer reported the same unconstrained paths as for the 14.1 build.
+
+## Modelsim and Questasim Avalon-MM BFM Simulation
+
+The Qsys system simulation script (hdl/qsys_system/scripts/sim.tcl) needs several minor edits to operate in newer versions of the simulator. Run the sim.tcl script in the simulator first, and it will be obvious which of the following edits are needed.
+
+1. Library name change
+
+ Lines 138 and 139 in the script:
+ ~~~
+ vlog -sv $hdl/qsys_system/test/qsys_system_bfm_master_tb.sv -L qsys_system_bfm_master
+ vlog -sv $hdl/qsys_system/test/qsys_system_jtag_master_tb.sv -L qsys_system_bfm_master
+ ~~~
+ Need to be changed to:
+ ~~~
+ vlog -sv $hdl/qsys_system/test/qsys_system_bfm_master_tb.sv -L altera_common_sv_packages
+ vlog -sv $hdl/qsys_system/test/qsys_system_jtag_master_tb.sv -L altera_common_sv_packages
+ ~~~
+
+2. The elab Tcl variable ELAB_OPTIONS needs to be visible within the two testbench procedures
+
+ Lines 166 and 178 in the script:
+ ~~~
+ global hdl QSYS_SIMDIR
+ ~~~
+ Need to be changed to:
+ ~~~
+ global hdl QSYS_SIMDIR ELAB_OPTIONS
+ ~~~
+
+3. Questasim waveform display is empty
+
+ Add the following statements to each of the testbench procedures starting lines 170 and 182:
+ ~~~
+ set USER_DEFINED_ELAB_OPTIONS "-voptargs=+acc"
+ ~~~
+
+Of the Quartus Modelsim and Questasim free editions tested, the following edits were required:
+ - v14.1 required 1
+ - v15.0 required 1+2
+ - v22.1 required 1+2+3
+
+
+## Modelsim and Questasim JTAG Simulation
+
+The testbench hdl/qsys_system/test/qsys_system_jtag_master_tb.sv uses the JTAG node buried within the JTAG-to-Avalon-MM bridge to exercise the JTAG TAP (read the header comments to understand how VTAP is defined). In the newer versions of Quartus tested, the generated JTAG-to-Avalon-MM master code no longer contains the 'node' instance representing the TAP controller. The generated code now contains JTAG SLD Virtual JTAG ports that are connected through the design hierarchy until the JTAG component instance within the top-level jtag_master, where the JTAG TAP ports are tied off to zeros. The new Intel JTAG-to-Avalon-MM version of this tutorial will update the testbench to control the JTAG TAP ports.
+
