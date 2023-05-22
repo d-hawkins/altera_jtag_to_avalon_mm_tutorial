@@ -170,6 +170,8 @@ Synthesizing the BeMicro-SDK 'qsys_system' design
 
 Timing Analyzer reported the same unconstrained paths as for the 14.1 build.
 
+# Simulation Tests
+
 ## Modelsim and Questasim Avalon-MM BFM Simulation
 
 The Qsys system simulation script (hdl/qsys_system/scripts/sim.tcl) needs several minor edits to operate in newer versions of the simulator. Run the sim.tcl script in the simulator first, and it will be obvious which of the following edits are needed.
